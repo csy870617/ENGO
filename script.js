@@ -812,31 +812,51 @@ function googleLogin() {
   });
 }
 
-// 로그아웃
-function googleLogout() {
-  if (!auth) return;
-  auth.signOut().then(() => {
-    alert("로그아웃 되었습니다.");
-    location.reload(); // 데이터 초기화를 위해 새로고침
-  });
-}
+// 구글 로그인 함수 (에러 처리 강화)
+function googleLogin() {
+  if (!auth) return alert("Firebase 설정 오류");
 
-// UI 업데이트
-function updateAuthUI(isLoggedIn) {
-  const btnLogin = document.getElementById("btn-login");
-  const userProfile = document.getElementById("user-profile");
-  const userPhoto = document.getElementById("user-photo");
+  const btn = document.getElementById("btn-login");
+  
+  // 이미 로딩 중이면 클릭 방지
+  if(btn.disabled) return;
 
-  if (isLoggedIn && currentUser) {
-    btnLogin.classList.add("hidden");
-    userProfile.classList.remove("hidden");
-    userProfile.style.display = "flex"; // flex 속성 강제
-    userPhoto.src = currentUser.photoURL || "https://via.placeholder.com/32";
-  } else {
-    btnLogin.classList.remove("hidden");
-    userProfile.classList.add("hidden");
-    userProfile.style.display = "none";
-  }
+  // 버튼 원래 내용 저장
+  const originalContent = btn.innerHTML;
+  
+  // 로딩 상태로 변경
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> 접속 중...';
+  btn.style.opacity = "0.7";
+  btn.style.cursor = "wait";
+
+  const provider = new firebase.auth.GoogleAuthProvider();
+  
+  auth.signInWithPopup(provider)
+    .then((result) => {
+      console.log("로그인 성공");
+      // 성공 시 UI 처리는 auth.onAuthStateChanged에서 자동으로 함
+    })
+    .catch((error) => {
+      console.error("로그인 에러:", error);
+      
+      // 💡 에러 유형별로 알림 메시지 구분
+      if (error.code === 'auth/popup-closed-by-user') {
+        alert("로그인 창이 닫혔습니다. 다시 시도해 주세요.");
+      } else if (error.code === 'auth/popup-blocked') {
+        alert("팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해 주세요.");
+      } else if (error.code === 'auth/cancelled-popup-request') {
+        // 중복 클릭 등으로 팝업 요청이 취소된 경우 (조용히 넘어감)
+      } else {
+        alert("로그인 실패: " + error.message);
+      }
+      
+      // 버튼 원상복구 (다시 클릭할 수 있게)
+      btn.disabled = false;
+      btn.innerHTML = originalContent;
+      btn.style.opacity = "1";
+      btn.style.cursor = "pointer";
+    });
 }
 
 // 데이터 저장 (로컬 + 클라우드 동시 저장)
@@ -937,3 +957,4 @@ if (typeof patternData !== "undefined") updatePatternProgress();
 if (typeof wordData !== "undefined") updateWordProgress();
 if (typeof idiomData !== "undefined") updateIdiomProgress();
 goTo("home");
+
