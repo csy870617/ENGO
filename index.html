@@ -20,6 +20,27 @@
     </div>
   </header>
   <main>
+    <section id="page-home">
+      
+      <section id="home-hero">
+        <div class="card">
+          <h1>“영어 회화의 시작, ENGO”</h1>
+          <p class="home-sub">
+            더 찾을 필요 없습니다.<br/>
+            말하기에 필요한 핵심만 담았습니다.
+          </p>
+        </div>
+      </section> <div class="home-grid">
+         <div class="home-tile" onclick="goTo('patterns')">...</div>
+         <div class="home-tile" onclick="goTo('conversations')">...</div>
+         <div class="home-tile" onclick="goTo('puzzle')">...</div>
+         <div class="home-tile" onclick="goTo('speaking')">...</div>
+         <div class="home-tile" onclick="goTo('words')">...</div>
+         <div class="home-tile" onclick="goTo('idioms')">...</div>
+      </div>
+
+    </section>
+    
     <!-- HOME PAGE -->
     <section id="home-hero">
       <div class="card">
@@ -447,6 +468,36 @@
       </div>
     </section>
 
+      <section id="page-shadowing" class="hidden">
+      <div class="page-title-row">
+        <span class="back-link" onclick="goTo('conv-detail')">← 대화로 돌아가기</span>
+      </div>
+
+      <div class="card">
+        <h2>따라 말하기 (Shadowing)</h2>
+        <p class="subtext">
+          문장을 듣고, 잠시 멈춘 뒤 그대로 따라 말하는 훈련입니다.
+        </p>
+      </div>
+
+      <div class="card">
+        <div class="section-header">현재 문장</div>
+        <p id="shadowing-text" class="shadowing-text">
+          문장을 선택해주세요.
+        </p>
+
+        <div class="button-row">
+          <button class="btn small" onclick="playShadowingCurrent()">
+            ▶ 현재 문장 재생
+          </button>
+          <button class="btn small secondary" onclick="nextShadowing()">
+            다음 문장
+          </button>
+        </div>
+      </div>
+    </section>
+      
+
 
     <!-- PUZZLE PAGE -->
 <section id="page-puzzle" class="hidden">
@@ -620,3 +671,4 @@
   <script src="script.js" defer></script>
 </body>
 </html>
+
