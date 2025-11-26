@@ -200,7 +200,9 @@ function openPattern(id) {
   goTo("pattern-detail");
 
   // 🔊 [수정] 딜레이 없이 즉시 실행 (브라우저 차단 방지)
-  playPatternExamples();
+  if (autoPlayEnabled) {
+      playPatternExamples();
+    }
 }
 
 function renderPatternExamples() {
@@ -317,8 +319,10 @@ function openWord(id) {
   goTo("word-detail");
 
   // 🔊 [수정] 즉시 실행
-  const textToRead = `${w.word}. ${w.examples.map(e => e.en).join(". ")}`;
-  speakText(textToRead);
+  if (autoPlayEnabled) {
+      const textToRead = `${w.word}. ${w.examples.map(e => e.en).join(". ")}`;
+      speakText(textToRead);
+    }
 }
 
 function renderWordExamples() {
@@ -423,8 +427,10 @@ function openIdiom(id) {
   goTo("idiom-detail");
 
   // 🔊 [수정] 즉시 실행
-  const textToRead = `${item.idiom}. ${item.examples.map(e => e.en).join(". ")}`;
-  speakText(textToRead);
+  if (autoPlayEnabled) {
+      const textToRead = `${item.idiom}. ${item.examples.map(e => e.en).join(". ")}`;
+      speakText(textToRead);
+    }
 }
 
 function renderIdiomExamples() {
@@ -488,7 +494,9 @@ function openConversation(id) {
   goTo("conv-detail");
 
   // 🔊 [수정] 즉시 실행
-  playConversationAll();
+  if (autoPlayEnabled) {
+      playConversationAll();
+    }
 }
 
 function renderConversationDetail() {
@@ -695,13 +703,13 @@ function playSpeakingAnswer() { if(currentSpeaking) speakText(currentSpeaking.a.
 
 
 // ==========================================
-// 9. TTS 설정 및 Firebase 인증/자동저장
+// 9. TTS 설정 및 학습내용 저장/불러오기
 // ==========================================
 let ttsVoices = [];
 let userVoiceIndex = null;
 let userRate = 1.0;
+let autoPlayEnabled = true;
 
-// TTS 설정 로드
 function loadVoices() {
   ttsVoices = window.speechSynthesis.getVoices();
   const sel = document.getElementById("tts-voice-select");
@@ -720,27 +728,33 @@ function loadVoices() {
     const d = JSON.parse(raw);
     userVoiceIndex = d.voiceIndex;
     userRate = d.rate || 1.0;
+    if (d.autoPlay !== undefined) autoPlayEnabled = d.autoPlay;
   }
 }
 if("speechSynthesis" in window) window.speechSynthesis.onvoiceschanged = loadVoices;
 
 function speakText(text) {
-  if(!("speechSynthesis" in window)) return;
+  if (!("speechSynthesis" in window)) {
+    alert("이 브라우저는 음성 합성을 지원하지 않습니다.");
+    return;
+  }
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   u.lang = "en-US";
-  u.rate = userRate;
-  if(userVoiceIndex !== null && ttsVoices[userVoiceIndex]) u.voice = ttsVoices[userVoiceIndex];
+  u.rate = userRate || 1.0;
+  if (ttsVoices.length === 0) ttsVoices = window.speechSynthesis.getVoices();
+  if (userVoiceIndex !== null && ttsVoices[userVoiceIndex]) u.voice = ttsVoices[userVoiceIndex];
   window.speechSynthesis.speak(u);
 }
 
-// 설정 모달 관련
 function openSettingsModal() {
   document.getElementById("settings-modal").classList.remove("hidden");
   const sel = document.getElementById("tts-voice-select");
   const rng = document.getElementById("tts-rate-range");
+  const chk = document.getElementById("tts-autoplay-toggle");
   if(sel) sel.value = userVoiceIndex !== null ? userVoiceIndex : "";
   if(rng) rng.value = userRate;
+  if(chk) chk.checked = autoPlayEnabled;
   updateRateLabel();
 }
 function closeSettingsModal() { document.getElementById("settings-modal").classList.add("hidden"); }
@@ -759,15 +773,20 @@ function previewVoiceSettings() {
 function saveSettings() {
   userVoiceIndex = document.getElementById("tts-voice-select").value || null;
   userRate = parseFloat(document.getElementById("tts-rate-range").value);
-  localStorage.setItem("ttsSettings", JSON.stringify({ voiceIndex: userVoiceIndex, rate: userRate }));
+  autoPlayEnabled = document.getElementById("tts-autoplay-toggle").checked;
+  localStorage.setItem("ttsSettings", JSON.stringify({ 
+    voiceIndex: userVoiceIndex, 
+    rate: userRate,
+    autoPlay: autoPlayEnabled 
+  }));
   closeSettingsModal();
 }
 
 // ---------------------------------------------------------
-// 🔥 [핵심 변경] Firebase 인증 및 자동 동기화
+// [수정됨] 학습내용 저장/불러오기 (수동 ID/PW 방식)
 // ---------------------------------------------------------
 
-// ⚠️ 본인의 Firebase 키로 반드시 교체하세요!
+// ⚠️ 본인의 Firebase 키로 유지하세요!
 const firebaseConfig = {
   apiKey: "AIzaSyCdr88Bomc9SQzZBj03iih3epxivhPL63I",
   authDomain: "engo-9c8e3.firebaseapp.com",
@@ -778,160 +797,131 @@ const firebaseConfig = {
   measurementId: "G-KHE07H3HKR"
 };
 
-let db, auth;
-let currentUser = null; // 현재 로그인한 유저 정보
-
+let db;
 if (typeof firebase !== "undefined") {
+  try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); } catch (e) { console.error(e); }
+}
+
+function openSyncModal() {
+  document.getElementById("sync-modal").classList.remove("hidden");
+  // 이전에 입력한 아이디가 있으면 자동 입력
+  const lastId = localStorage.getItem("lastSyncId");
+  if(lastId) document.getElementById("sync-id").value = lastId;
+}
+function closeSyncModal() { document.getElementById("sync-modal").classList.add("hidden"); }
+
+// 데이터 업로드 (저장)
+async function uploadData() {
+  const id = document.getElementById("sync-id").value.trim();
+  const pw = document.getElementById("sync-pw").value.trim();
+  
+  if(!id || !pw) return alert("아이디와 비밀번호를 모두 입력해주세요.");
+  if(!db) return alert("데이터베이스 연결 실패");
+
   try {
-    firebase.initializeApp(firebaseConfig);
-    db = firebase.firestore();
-    auth = firebase.auth();
-    
-    // 로그인 상태 변화 감지 (앱 켜질 때 자동 실행)
-    auth.onAuthStateChanged((user) => {
-      if (user) {
-        // 로그인 됨
-        currentUser = user;
-        updateAuthUI(true);
-        loadDataFromCloud(); // 클라우드 데이터 불러오기
-      } else {
-        // 로그아웃 됨
-        currentUser = null;
-        updateAuthUI(false);
+    const ref = db.collection("users").doc(id);
+    const doc = await ref.get();
+
+    // 이미 존재하는 아이디면 비번 확인
+    if(doc.exists) {
+      if(doc.data().password !== pw) {
+        return alert("비밀번호가 틀렸습니다.\n(다른 사람이 사용 중인 아이디일 수 있습니다.)");
       }
+      if(!confirm("기존 데이터를 덮어쓰고 저장하시겠습니까?")) return;
+    } else {
+      // 새로운 아이디면 생성 확인
+      if(!confirm(`'${id}' 계정을 새로 만들고 저장하시겠습니까?`)) return;
+    }
+
+    // 저장할 데이터 구성
+    await ref.set({
+      password: pw, // 비번 저장 (간단한 방식)
+      updatedAt: new Date().toISOString(),
+      patterns: Array.from(memorizedPatterns),
+      words: Array.from(memorizedWords),
+      idioms: Array.from(memorizedIdioms),
+      settings: { voiceIndex: userVoiceIndex, rate: userRate, autoPlay: autoPlayEnabled }
     });
-  } catch (e) { console.error("Firebase Init Error:", e); }
-}
 
-// 구글 로그인
-function googleLogin() {
-  if (!auth) return alert("Firebase 설정 오류");
-  const provider = new firebase.auth.GoogleAuthProvider();
-  auth.signInWithPopup(provider).catch((error) => {
-    alert("로그인 실패: " + error.message);
-  });
-}
-
-// 구글 로그인 함수 (에러 처리 강화)
-function googleLogin() {
-  if (!auth) return alert("Firebase 설정 오류");
-
-  const btn = document.getElementById("btn-login");
-  
-  // 이미 로딩 중이면 클릭 방지
-  if(btn.disabled) return;
-
-  // 버튼 원래 내용 저장
-  const originalContent = btn.innerHTML;
-  
-  // 로딩 상태로 변경
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> 접속 중...';
-  btn.style.opacity = "0.7";
-  btn.style.cursor = "wait";
-
-  const provider = new firebase.auth.GoogleAuthProvider();
-  
-  auth.signInWithPopup(provider)
-    .then((result) => {
-      console.log("로그인 성공");
-      // 성공 시 UI 처리는 auth.onAuthStateChanged에서 자동으로 함
-    })
-    .catch((error) => {
-      console.error("로그인 에러:", error);
-      
-      // 💡 에러 유형별로 알림 메시지 구분
-      if (error.code === 'auth/popup-closed-by-user') {
-        alert("로그인 창이 닫혔습니다. 다시 시도해 주세요.");
-      } else if (error.code === 'auth/popup-blocked') {
-        alert("팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해 주세요.");
-      } else if (error.code === 'auth/cancelled-popup-request') {
-        // 중복 클릭 등으로 팝업 요청이 취소된 경우 (조용히 넘어감)
-      } else {
-        alert("로그인 실패: " + error.message);
-      }
-      
-      // 버튼 원상복구 (다시 클릭할 수 있게)
-      btn.disabled = false;
-      btn.innerHTML = originalContent;
-      btn.style.opacity = "1";
-      btn.style.cursor = "pointer";
-    });
-}
-
-// 데이터 저장 (로컬 + 클라우드 동시 저장)
-// saveData() 함수는 기존 로직에서 호출될 때 이 함수가 실행됨
-function saveData(type) {
-  // 1. 로컬 저장 (기본)
-  if (type === 'pattern') localStorage.setItem("patternMemorizedIds", JSON.stringify(Array.from(memorizedPatterns)));
-  if (type === 'word') localStorage.setItem("wordMemorizedIds", JSON.stringify(Array.from(memorizedWords)));
-  if (type === 'idiom') localStorage.setItem("idiomMemorizedIds", JSON.stringify(Array.from(memorizedIdioms)));
-
-  // 진행률 업데이트
-  if (type === 'pattern') updatePatternProgress();
-  if (type === 'word') updateWordProgress();
-  if (type === 'idiom') updateIdiomProgress();
-
-  // 2. 클라우드 자동 저장 (로그인 상태일 때만)
-  if (currentUser && db) {
-    const docRef = db.collection("users").doc(currentUser.uid);
-    
-    // 변경된 데이터만 부분 업데이트 (merge)
-    let updateData = {};
-    if (type === 'pattern') updateData.patterns = Array.from(memorizedPatterns);
-    if (type === 'word') updateData.words = Array.from(memorizedWords);
-    if (type === 'idiom') updateData.idioms = Array.from(memorizedIdioms);
-    updateData.updatedAt = new Date().toISOString();
-
-    // set({ ... }, { merge: true })를 써서 기존 필드 보존
-    docRef.set(updateData, { merge: true }).then(() => {
-      console.log(`[Cloud] ${type} saved.`);
-    }).catch((err) => console.error("Cloud save error:", err));
+    localStorage.setItem("lastSyncId", id); // 아이디 기억
+    alert("✅ 학습내용이 안전하게 저장되었습니다.");
+    closeSyncModal();
+  } catch(e) {
+    console.error(e);
+    alert("오류 발생: " + e.message);
   }
 }
 
-// 클라우드에서 데이터 불러오기 (로그인 시 1회 실행)
-async function loadDataFromCloud() {
-  if (!currentUser || !db) return;
-  
+// 데이터 다운로드 (불러오기)
+async function downloadData() {
+  const id = document.getElementById("sync-id").value.trim();
+  const pw = document.getElementById("sync-pw").value.trim();
+
+  if(!id || !pw) return alert("아이디와 비밀번호를 입력해주세요.");
+  if(!db) return alert("데이터베이스 연결 실패");
+
   try {
-    const docRef = db.collection("users").doc(currentUser.uid);
-    const doc = await docRef.get();
+    const ref = db.collection("users").doc(id);
+    const doc = await ref.get();
 
-    if (doc.exists) {
-      const data = doc.data();
-      
-      // 클라우드 데이터가 있으면 로컬 변수 덮어쓰기
-      if (data.patterns) memorizedPatterns = new Set(data.patterns);
-      if (data.words) memorizedWords = new Set(data.words);
-      if (data.idioms) memorizedIdioms = new Set(data.idioms);
-      
-      // 로컬 스토리지도 동기화
-      localStorage.setItem("patternMemorizedIds", JSON.stringify(Array.from(memorizedPatterns)));
-      localStorage.setItem("wordMemorizedIds", JSON.stringify(Array.from(memorizedWords)));
-      localStorage.setItem("idiomMemorizedIds", JSON.stringify(Array.from(memorizedIdioms)));
+    if(!doc.exists) return alert("존재하지 않는 아이디입니다.");
+    if(doc.data().password !== pw) return alert("비밀번호가 틀렸습니다.");
 
-      // 화면 갱신
-      updatePatternProgress();
-      updateWordProgress();
-      updateIdiomProgress();
-      
-      // 현재 보고 있는 리스트가 있다면 갱신
-      const currPage = history.state ? history.state.page : 'home';
-      if (currPage === 'patterns') renderPatternList();
-      if (currPage === 'words') renderWordList();
-      if (currPage === 'idioms') renderIdiomList();
-      
-      console.log("Data synced from cloud.");
-    } else {
-      // 클라우드에 데이터가 없는 경우 (첫 로그인) -> 현재 로컬 데이터를 클라우드에 업로드
-      console.log("New user. Uploading local data...");
-      saveData('pattern');
-      saveData('word');
-      saveData('idiom');
+    if(!confirm("현재 기기의 학습 기록을 지우고,\n서버에 저장된 내용을 불러오시겠습니까?")) return;
+
+    const d = doc.data();
+    
+    // 데이터 복원
+    if(d.patterns) memorizedPatterns = new Set(d.patterns);
+    if(d.words) memorizedWords = new Set(d.words);
+    if(d.idioms) memorizedIdioms = new Set(d.idioms);
+    if(d.settings) {
+      userVoiceIndex = d.settings.voiceIndex;
+      userRate = d.settings.rate;
+      if(d.settings.autoPlay !== undefined) autoPlayEnabled = d.settings.autoPlay;
     }
-  } catch (e) {
-    console.error("Load data error:", e);
+    
+    // 로컬 스토리지 업데이트
+    saveDataLocally('pattern'); 
+    saveDataLocally('word'); 
+    saveDataLocally('idiom');
+    localStorage.setItem("ttsSettings", JSON.stringify({ voiceIndex: userVoiceIndex, rate: userRate, autoPlay: autoPlayEnabled }));
+    localStorage.setItem("lastSyncId", id);
+    
+    // 화면 갱신
+    updatePatternProgress(); updateWordProgress(); updateIdiomProgress();
+    
+    // 현재 보고 있는 리스트가 있다면 새로고침
+    const currPage = history.state ? history.state.page : 'home';
+    if (currPage === 'patterns') renderPatternList();
+    if (currPage === 'words') renderWordList();
+    if (currPage === 'idioms') renderIdiomList();
+    
+    alert("✅ 학습내용을 성공적으로 불러왔습니다.");
+    closeSyncModal();
+  } catch(e) {
+    console.error(e);
+    alert("오류 발생: " + e.message);
+  }
+}
+
+// 로컬 저장 전용 함수 (체크박스 클릭 시 호출됨)
+function saveData(type) {
+  saveDataLocally(type);
+}
+
+function saveDataLocally(type) {
+  if (type === 'pattern') {
+    localStorage.setItem("patternMemorizedIds", JSON.stringify(Array.from(memorizedPatterns)));
+    updatePatternProgress();
+  }
+  if (type === 'word') {
+    localStorage.setItem("wordMemorizedIds", JSON.stringify(Array.from(memorizedWords)));
+    updateWordProgress();
+  }
+  if (type === 'idiom') {
+    localStorage.setItem("idiomMemorizedIds", JSON.stringify(Array.from(memorizedIdioms)));
+    updateIdiomProgress();
   }
 }
 
@@ -947,14 +937,10 @@ document.body.addEventListener('click', function unlockTTS() {
   document.body.removeEventListener('click', unlockTTS);
 }, { once: true });
 
-// 초기화 실행
 loadMemorizedData();
 loadVoices();
-if (!history.state) {
-  history.replaceState({ page: 'home' }, "", "#home");
-}
+if (!history.state) history.replaceState({ page: 'home' }, "", "#home");
 if (typeof patternData !== "undefined") updatePatternProgress();
 if (typeof wordData !== "undefined") updateWordProgress();
 if (typeof idiomData !== "undefined") updateIdiomProgress();
 goTo("home");
-
