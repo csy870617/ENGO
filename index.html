@@ -19,7 +19,7 @@
       <button class="btn small secondary" onclick="openSettingsModal()">⚙ 설정</button>
     </div>
   </header>
-  <main>
+<main>
     <section id="page-home">
       
       <section id="home-hero">
@@ -30,58 +30,39 @@
             말하기에 필요한 핵심만 담았습니다.
           </p>
         </div>
-      </section> <div class="home-grid">
-         <div class="home-tile" onclick="goTo('patterns')">...</div>
-         <div class="home-tile" onclick="goTo('conversations')">...</div>
-         <div class="home-tile" onclick="goTo('puzzle')">...</div>
-         <div class="home-tile" onclick="goTo('speaking')">...</div>
-         <div class="home-tile" onclick="goTo('words')">...</div>
-         <div class="home-tile" onclick="goTo('idioms')">...</div>
+      </section>
+
+      <div class="home-grid">
+        <div class="home-tile" onclick="goTo('patterns')">
+            <span class="label">패턴 학습</span>
+            <span class="desc">핵심 표현을 덩어리로 익히기</span>
+        </div>
+        
+        <div class="home-tile" onclick="goTo('conversations')">
+            <span class="label">대화 학습</span>
+            <span class="desc">실제 대화 속 표현 연습</span>
+        </div>
+        
+        <div class="home-tile" onclick="goTo('puzzle')">
+            <span class="label">문장 퍼즐</span>
+            <span class="desc">한글 보고 영어 재조립</span>
+        </div>
+        
+        <div class="home-tile" onclick="goTo('speaking')">
+            <span class="label">말하기 연습</span>
+            <span class="desc">직접 말해보는 스피킹 훈련</span>
+        </div>
+
+        <div class="home-tile" onclick="goTo('words')">
+            <span class="label">단어 학습</span>
+            <span class="desc">필수 단어 빠른 암기</span>
+        </div>
+
+        <div class="home-tile" onclick="goTo('idioms')">
+            <span class="label">숙어/구동사 학습</span>
+            <span class="desc">자연스러운 표현 익히기</span>
+        </div>
       </div>
-
-    </section>
-    
-    <!-- HOME PAGE -->
-    <section id="home-hero">
-      <div class="card">
-        <h1>“영어의 시작부터 끝까지, ENGO”</h1>
-        <p class="home-sub">
-          영어 공부 뭐로 하지? 더 이상 찾을 필요 없습니다.<br/>
-          영어 회화에 필요한 핵심만 담았습니다.
-        </p>
-      </div>
-
-    <div class="home-grid">
-    <div class="home-tile" onclick="goTo('patterns')">
-        <span class="label">패턴 학습</span>
-        <span class="desc">핵심 표현을 덩어리로 익히기</span>
-    </div>
-    
-    <div class="home-tile" onclick="goTo('conversations')">
-        <span class="label">대화 학습</span>
-        <span class="desc">실제 대화 속 표현 연습</span>
-    </div>
-    
-    <div class="home-tile" onclick="goTo('puzzle')">
-        <span class="label">문장 퍼즐</span>
-        <span class="desc">한글 보고 영어 재조립</span>
-    </div>
-    
-    <div class="home-tile" onclick="goTo('speaking')">
-        <span class="label">말하기 연습</span>
-        <span class="desc">직접 말해보는 스피킹 훈련</span>
-    </div>
-
-    <div class="home-tile" onclick="goTo('words')">
-        <span class="label">단어 학습</span>
-        <span class="desc">필수 단어 빠른 암기</span>
-    </div>
-
-    <div class="home-tile" onclick="goTo('idioms')">
-        <span class="label">숙어/구동사 학습</span>
-        <span class="desc">자연스러운 표현 익히기</span>
-    </div>
-    </div>
 
 
     <!-- PATTERN LIST PAGE -->
@@ -671,4 +652,5 @@
   <script src="script.js" defer></script>
 </body>
 </html>
+
 
