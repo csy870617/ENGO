@@ -1,65 +1,33 @@
 // ==========================================
-// 🚨 카카오톡 인앱 브라우저 탈출 스크립트
+// 🚨 카카오톡 인앱 브라우저 탈출 및 초기 설정
 // ==========================================
 (function() {
-  const userAgent = navigator.userAgent.toLowerCase();
-  const targetUrl = location.href;
-
-  // 카카오톡 인앱 브라우저인지 확인
-  if (userAgent.indexOf('kakaotalk') > -1) {
-    
-    // 1. 안드로이드: 크롬으로 강제 전환 시도
-    if (userAgent.indexOf('android') > -1) {
-      location.href = 'intent://' + targetUrl.replace(/https?:\/\//i, '') + '#Intent;scheme=https;package=com.android.chrome;end';
-    } 
-    // 2. 아이폰(iOS): 강제로 못 띄우므로 안내 메시지 표시
-    else if (userAgent.indexOf('iphone') > -1 || userAgent.indexOf('ipad') > -1 || userAgent.indexOf('ipod') > -1) {
-      // 안내 화면을 위한 스타일 생성
+  const ua = navigator.userAgent.toLowerCase();
+  const url = location.href;
+  if (ua.indexOf('kakaotalk') > -1) {
+    if (ua.indexOf('android') > -1) {
+      location.href = 'intent://' + url.replace(/https?:\/\//i, '') + '#Intent;scheme=https;package=com.android.chrome;end';
+    } else if (ua.indexOf('iphone') > -1 || ua.indexOf('ipad') > -1) {
       const style = document.createElement('style');
-      style.innerHTML = `
-        body { margin: 0; padding: 0; overflow: hidden; }
-        #kakao-guide {
-          position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-          background: rgba(0,0,0,0.9); z-index: 99999;
-          display: flex; flex-direction: column; align-items: center; justify-content: center;
-          color: white; text-align: center; font-family: sans-serif;
-        }
-        #kakao-guide p { margin: 10px 0; font-size: 18px; line-height: 1.5; }
-        .arrow { font-size: 40px; animation: bounce 1s infinite; }
-        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-      `;
+      style.innerHTML = `body { margin: 0; padding: 0; overflow: hidden; } #kakao-guide { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 99999; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; text-align: center; font-family: sans-serif; } .arrow { font-size: 40px; animation: bounce 1s infinite; } @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }`;
       document.head.appendChild(style);
-
-      // 안내 화면 HTML 생성
       const guide = document.createElement('div');
       guide.id = 'kakao-guide';
-      guide.innerHTML = `
-        <div class="arrow">↗️</div>
-        <p><strong>카카오톡 브라우저에서는<br>저장 기능이 작동하지 않습니다.</strong></p>
-        <p>오른쪽 하단(또는 상단)의<br><strong>[점 3개 ...]</strong> 메뉴를 누르고</p>
-        <p><span style="color:#FEE500; font-weight:bold;">[다른 브라우저로 열기]</span>를<br>선택해주세요.</p>
-        <div style="margin-top:20px; font-size:14px; color:#aaa;">(Safari 또는 Chrome 권장)</div>
-      `;
+      guide.innerHTML = `<div class="arrow">↗️</div><p><strong>카카오톡 브라우저에서는<br>저장 기능이 작동하지 않습니다.</strong></p><p>오른쪽 하단(또는 상단)의<br><strong>[점 3개 ...]</strong> 메뉴를 누르고</p><p><span style="color:#FEE500; font-weight:bold;">[다른 브라우저로 열기]</span>를<br>선택해주세요.</p>`;
       document.body.appendChild(guide);
-      
-      // 기존 화면 터치 방지
-      document.body.addEventListener('touchmove', function(e){e.preventDefault()}, { passive: false });
     }
   }
 })();
 
-// --------------------------
+// ==========================================
 // 1. 전역 변수 및 데이터 준비
-// --------------------------
-
-// SPA 네비게이션 페이지 목록
+// ==========================================
 const pages = [
   "home", "patterns", "pattern-detail", "words", "word-detail",
   "idioms", "idiom-detail", "conversations", "conv-detail",
   "shadowing", "puzzle", "speaking"
 ];
 
-// 숙어 데이터 합치기 (idiom.js 파일이 있을 때만)
 const idiomData = [
   ...(typeof idiomsLevel1 !== "undefined" ? idiomsLevel1 : []),
   ...(typeof idiomsLevel2 !== "undefined" ? idiomsLevel2 : []),
@@ -68,20 +36,17 @@ const idiomData = [
   ...(typeof idiomsLevel5 !== "undefined" ? idiomsLevel5 : [])
 ];
 
-// 현재 선택된 아이템 ID 저장
 let currentPatternId = null;
 let currentConvId = null;
 let currentWordId = null;
 let currentIdiomId = null;
 
-// 필터링된 현재 리스트 저장 (이전/다음 이동용)
 let currentPatternList = [];
 let currentWordList = [];
 let currentIdiomList = [];
 let currentConvList = [];
 
-// 단어/숙어/패턴 상태 관리
-let selectedWordLevel = 0;      // 0 = 전체
+let selectedWordLevel = 0;
 let memorizedWords = new Set();
 let wordStudyingOnly = false;
 
@@ -92,10 +57,9 @@ let idiomStudyingOnly = false;
 let memorizedPatterns = new Set();
 let patternStudyingOnly = false;
 
-
-// --------------------------
-// 2. 네비게이션 (SPA)
-// --------------------------
+// ==========================================
+// 2. 네비게이션
+// ==========================================
 function goTo(page) {
   pages.forEach((p) => {
     const el = document.getElementById("page-" + p);
@@ -104,7 +68,6 @@ function goTo(page) {
     else el.classList.add("hidden");
   });
 
-  // 페이지 진입 시 초기화 로직
   if (page === "patterns") renderPatternList();
   if (page === "words") renderWordList();
   if (page === "idioms") renderIdiomList();
@@ -114,24 +77,20 @@ function goTo(page) {
   if (page === "shadowing") initShadowing();
 }
 
-
-// --------------------------
+// ==========================================
 // 3. 데이터 저장/로드 (LocalStorage)
-// --------------------------
+// ==========================================
 function loadMemorizedData() {
-  // 패턴
   try {
     const pRaw = localStorage.getItem("patternMemorizedIds");
     if (pRaw) memorizedPatterns = new Set(JSON.parse(pRaw));
   } catch (e) { console.warn(e); }
 
-  // 단어
   try {
     const wRaw = localStorage.getItem("wordMemorizedIds");
     if (wRaw) memorizedWords = new Set(JSON.parse(wRaw));
   } catch (e) { console.warn(e); }
 
-  // 숙어
   try {
     const iRaw = localStorage.getItem("idiomMemorizedIds");
     if (iRaw) memorizedIdioms = new Set(JSON.parse(iRaw));
@@ -153,22 +112,15 @@ function saveData(type) {
   }
 }
 
-
-// --------------------------
-// 4. 패턴 (Patterns) 로직
-// --------------------------
+// ==========================================
+// 4. 패턴 (Patterns) 로직 (복구됨)
+// ==========================================
 function renderPatternList() {
   const container = document.getElementById("pattern-list");
   if (!container) return;
-  
-  // 데이터 체크
-  if (typeof patternData === "undefined") {
-    container.innerHTML = '<div class="list-item"><div>pattern.js 파일이 연결되지 않았습니다.</div></div>';
-    return;
-  }
+  if (typeof patternData === "undefined") return;
 
-  const input = document.getElementById("pattern-search");
-  const keyword = (input ? input.value : "").toLowerCase();
+  const keyword = (document.getElementById("pattern-search")?.value || "").toLowerCase();
   container.innerHTML = "";
 
   const filtered = patternData.filter((p) => {
@@ -177,20 +129,17 @@ function renderPatternList() {
     return matchText && matchStudy;
   });
 
-  currentPatternList = filtered; // 리스트 저장
+  currentPatternList = filtered;
 
   filtered.forEach((p) => {
     const div = document.createElement("div");
     div.className = "list-item";
     if (memorizedPatterns.has(p.id)) div.classList.add("memorized");
-
-    // 상세 이동
     div.onclick = () => openPattern(p.id);
 
     const left = document.createElement("div");
     left.innerHTML = `<div class="list-item-title">${p.title}</div><div class="list-item-sub">${p.desc}</div>`;
 
-    // 체크박스
     const check = document.createElement("input");
     check.type = "checkbox";
     check.className = "pattern-check";
@@ -207,37 +156,29 @@ function renderPatternList() {
     div.appendChild(check);
     container.appendChild(div);
   });
-
   if (filtered.length === 0) container.innerHTML = '<div class="list-item"><div>검색 결과가 없습니다.</div></div>';
   updatePatternProgress();
 }
 
 function updatePatternProgress() {
   if (typeof patternData === "undefined") return;
-  const labelEl = document.getElementById("pattern-progress");
-  const barEl = document.getElementById("pattern-progress-bar");
-  if (!labelEl || !barEl) return;
-
+  const label = document.getElementById("pattern-progress");
+  const bar = document.getElementById("pattern-progress-bar");
   const total = patternData.length;
   const done = patternData.filter(p => memorizedPatterns.has(p.id)).length;
   const percent = total === 0 ? 0 : Math.round((done / total) * 100);
-
-  labelEl.textContent = `패턴 암기 ${done} / ${total}개 (${percent}%)`;
-  barEl.style.width = `${percent}%`;
+  if (label) label.textContent = `패턴 암기 ${done} / ${total}개 (${percent}%)`;
+  if (bar) bar.style.width = `${percent}%`;
 }
 
 function openPattern(id) {
-  if (typeof patternData === "undefined") return;
   currentPatternId = id;
   const pattern = patternData.find(p => p.id === id);
   if (!pattern) return;
-
   document.getElementById("pattern-title").textContent = pattern.title;
   document.getElementById("pattern-desc").textContent = pattern.desc;
-  
   const memCheck = document.getElementById("pattern-memorized-checkbox");
   if (memCheck) memCheck.checked = memorizedPatterns.has(id);
-
   document.getElementById("pattern-toggle-kr").checked = true;
   renderPatternExamples();
   goTo("pattern-detail");
@@ -249,17 +190,14 @@ function renderPatternExamples() {
   const showKr = document.getElementById("pattern-toggle-kr").checked;
   const container = document.getElementById("pattern-examples");
   container.innerHTML = "";
-
   pattern.examples.forEach(ex => {
     const row = document.createElement("div");
     row.className = "sentence-row";
     row.innerHTML = `<div class="sentence-text"><div>${ex.en}</div>${showKr ? `<div class="sentence-kr">${ex.kr}</div>` : ''}</div>`;
-    
     const btn = document.createElement("button");
     btn.className = "btn small";
     btn.textContent = "▶";
     btn.onclick = () => speakText(ex.en);
-    
     row.appendChild(btn);
     container.appendChild(row);
   });
@@ -273,7 +211,6 @@ function togglePatternStudying() {
 }
 
 function togglePatternMemorizedDetail() {
-  if (!currentPatternId) return;
   const chk = document.getElementById("pattern-memorized-checkbox");
   if (chk.checked) memorizedPatterns.add(currentPatternId);
   else memorizedPatterns.delete(currentPatternId);
@@ -282,25 +219,18 @@ function togglePatternMemorizedDetail() {
 }
 
 function playPatternExamples() {
-  const pattern = patternData.find(p => p.id === currentPatternId);
-  if (pattern) speakText(pattern.examples.map(ex => ex.en).join(". "));
+  const p = patternData.find(x => x.id === currentPatternId);
+  if (p) speakText(p.examples.map(e => e.en).join(". "));
 }
 
-
-// --------------------------
-// 5. 단어 (Words) 로직
-// --------------------------
+// ==========================================
+// 5. 단어 (Words)
+// ==========================================
 function renderWordList() {
   const container = document.getElementById("word-list");
-  if (!container) return;
-  if (typeof wordData === "undefined") {
-    container.innerHTML = '<div class="list-item"><div>word.js 파일이 없습니다.</div></div>';
-    return;
-  }
-
+  if (!container || typeof wordData === "undefined") return;
   const keyword = (document.getElementById("word-search")?.value || "").toLowerCase();
   container.innerHTML = "";
-
   const filtered = wordData.filter(w => {
     const matchText = (w.word + w.meaning).toLowerCase().includes(keyword);
     const level = parseInt(w.id.match(/^L(\d)-/)?.[1] || 0);
@@ -308,58 +238,45 @@ function renderWordList() {
     const matchStudy = !wordStudyingOnly || !memorizedWords.has(w.id);
     return matchText && matchLevel && matchStudy;
   });
-
   currentWordList = filtered;
-
   filtered.forEach(w => {
     const div = document.createElement("div");
     div.className = "list-item";
     if (memorizedWords.has(w.id)) div.classList.add("memorized");
     div.onclick = () => openWord(w.id);
-
-    const left = document.createElement("div");
-    left.innerHTML = `<div class="list-item-title">${w.word} - ${w.meaning}</div><div class="list-item-sub">${w.examples?.[0]?.kr || ""}</div>`;
-
+    div.innerHTML = `<div><div class="list-item-title">${w.word} - ${w.meaning}</div><div class="list-item-sub">${w.examples?.[0]?.kr || ""}</div></div>`;
     const check = document.createElement("input");
     check.type = "checkbox";
     check.className = "word-check";
     check.checked = memorizedWords.has(w.id);
     check.onclick = (e) => {
       e.stopPropagation();
-      if (check.checked) memorizedWords.add(w.id);
-      else memorizedWords.delete(w.id);
+      if (check.checked) memorizedWords.add(w.id); else memorizedWords.delete(w.id);
       saveData('word');
       if (wordStudyingOnly) renderWordList();
     };
-
-    div.appendChild(left);
     div.appendChild(check);
     container.appendChild(div);
   });
-  
   if (filtered.length === 0) container.innerHTML = '<div class="list-item"><div>검색 결과가 없습니다.</div></div>';
   updateWordProgress();
 }
 
 function updateWordProgress() {
   if (typeof wordData === "undefined") return;
-  const label = document.getElementById("word-progress");
-  const bar = document.getElementById("word-progress-bar");
-  
   const pool = selectedWordLevel === 0 ? wordData : wordData.filter(w => parseInt(w.id.match(/^L(\d)-/)?.[1] || 0) === selectedWordLevel);
   const total = pool.length;
   const done = pool.filter(w => memorizedWords.has(w.id)).length;
   const percent = total === 0 ? 0 : Math.round((done/total)*100);
-
-  label.textContent = `현재 레벨 기준 암기 ${done} / ${total}개 (${percent}%)`;
-  bar.style.width = `${percent}%`;
+  const label = document.getElementById("word-progress");
+  const bar = document.getElementById("word-progress-bar");
+  if (label) label.textContent = `현재 레벨 기준 암기 ${done} / ${total}개 (${percent}%)`;
+  if (bar) bar.style.width = `${percent}%`;
 }
 
 function setWordLevel(lvl) {
   selectedWordLevel = lvl;
-  document.querySelectorAll("[data-word-level-btn]").forEach(btn => {
-    btn.classList.toggle("active", parseInt(btn.dataset.wordLevelBtn) === lvl);
-  });
+  document.querySelectorAll("[data-word-level-btn]").forEach(b => b.classList.toggle("active", parseInt(b.dataset.wordLevelBtn) === lvl));
   renderWordList();
 }
 
@@ -373,12 +290,10 @@ function openWord(id) {
   currentWordId = id;
   const w = wordData.find(x => x.id === id);
   if (!w) return;
-
   document.getElementById("word-title").textContent = `${w.word} - ${w.meaning}`;
   document.getElementById("word-desc").textContent = w.examples?.[0]?.kr || w.meaning;
   document.getElementById("word-memorized-checkbox").checked = memorizedWords.has(id);
   document.getElementById("word-toggle-kr").checked = true;
-  
   renderWordExamples();
   goTo("word-detail");
 }
@@ -389,7 +304,6 @@ function renderWordExamples() {
   const showKr = document.getElementById("word-toggle-kr").checked;
   const container = document.getElementById("word-examples");
   container.innerHTML = "";
-
   w.examples.forEach(ex => {
     const row = document.createElement("div");
     row.className = "sentence-row";
@@ -404,10 +318,8 @@ function renderWordExamples() {
 }
 
 function toggleWordMemorizedDetail() {
-  if (!currentWordId) return;
   const chk = document.getElementById("word-memorized-checkbox");
-  if (chk.checked) memorizedWords.add(currentWordId);
-  else memorizedWords.delete(currentWordId);
+  if (chk.checked) memorizedWords.add(currentWordId); else memorizedWords.delete(currentWordId);
   saveData('word');
   renderWordList();
 }
@@ -417,74 +329,56 @@ function playWordExamples() {
   if (w) speakText(w.examples.map(e => e.en).join(". "));
 }
 
-
-// --------------------------
-// 6. 숙어 (Idioms) 로직
-// --------------------------
+// ==========================================
+// 6. 숙어 (Idioms)
+// ==========================================
 function renderIdiomList() {
   const container = document.getElementById("idiom-list");
   if (!container) return;
-  
   const keyword = (document.getElementById("idiom-search")?.value || "").toLowerCase();
   container.innerHTML = "";
-
   const filtered = idiomData.filter(i => {
     const matchText = (i.idiom + i.meaning).toLowerCase().includes(keyword);
     const matchLevel = selectedIdiomLevel === 0 || i.level === selectedIdiomLevel;
     const matchStudy = !idiomStudyingOnly || !memorizedIdioms.has(i.id);
     return matchText && matchLevel && matchStudy;
   });
-
   currentIdiomList = filtered;
-
   filtered.forEach(i => {
     const div = document.createElement("div");
     div.className = "list-item";
     if (memorizedIdioms.has(i.id)) div.classList.add("memorized");
     div.onclick = () => openIdiom(i.id);
-
-    const left = document.createElement("div");
-    left.innerHTML = `<div class="list-item-title">${i.idiom} - ${i.meaning}</div><div class="list-item-sub">${i.desc}</div>`;
-
+    div.innerHTML = `<div><div class="list-item-title">${i.idiom} - ${i.meaning}</div><div class="list-item-sub">${i.desc}</div></div>`;
     const check = document.createElement("input");
     check.type = "checkbox";
     check.className = "idiom-check";
     check.checked = memorizedIdioms.has(i.id);
     check.onclick = (e) => {
       e.stopPropagation();
-      if (check.checked) memorizedIdioms.add(i.id);
-      else memorizedIdioms.delete(i.id);
+      if (check.checked) memorizedIdioms.add(i.id); else memorizedIdioms.delete(i.id);
       saveData('idiom');
       if (idiomStudyingOnly) renderIdiomList();
     };
-
-    div.appendChild(left);
     div.appendChild(check);
     container.appendChild(div);
   });
-
   if (filtered.length === 0) container.innerHTML = '<div class="list-item"><div>검색 결과가 없습니다.</div></div>';
   updateIdiomProgress();
 }
 
 function updateIdiomProgress() {
-  const label = document.getElementById("idiom-progress");
-  const bar = document.getElementById("idiom-progress-bar");
-  
   const pool = selectedIdiomLevel === 0 ? idiomData : idiomData.filter(i => i.level === selectedIdiomLevel);
   const total = pool.length;
   const done = pool.filter(i => memorizedIdioms.has(i.id)).length;
   const percent = total === 0 ? 0 : Math.round((done/total)*100);
-
-  label.textContent = `현재 레벨 기준 암기 ${done} / ${total}개 (${percent}%)`;
-  bar.style.width = `${percent}%`;
+  document.getElementById("idiom-progress").textContent = `현재 레벨 기준 암기 ${done} / ${total}개 (${percent}%)`;
+  document.getElementById("idiom-progress-bar").style.width = `${percent}%`;
 }
 
 function setIdiomLevel(lvl) {
   selectedIdiomLevel = lvl;
-  document.querySelectorAll("[data-idiom-level-btn]").forEach(btn => {
-    btn.classList.toggle("active", parseInt(btn.dataset.idiomLevelBtn) === lvl);
-  });
+  document.querySelectorAll("[data-idiom-level-btn]").forEach(b => b.classList.toggle("active", parseInt(b.dataset.idiomLevelBtn) === lvl));
   renderIdiomList();
 }
 
@@ -498,12 +392,10 @@ function openIdiom(id) {
   currentIdiomId = id;
   const item = idiomData.find(x => x.id === id);
   if (!item) return;
-
   document.getElementById("idiom-title").textContent = `${item.idiom} - ${item.meaning}`;
   document.getElementById("idiom-desc").textContent = item.desc;
   document.getElementById("idiom-memorized-checkbox").checked = memorizedIdioms.has(id);
   document.getElementById("idiom-toggle-kr").checked = true;
-  
   renderIdiomExamples();
   goTo("idiom-detail");
 }
@@ -514,7 +406,6 @@ function renderIdiomExamples() {
   const showKr = document.getElementById("idiom-toggle-kr").checked;
   const container = document.getElementById("idiom-examples");
   container.innerHTML = "";
-
   item.examples.forEach(ex => {
     const row = document.createElement("div");
     row.className = "sentence-row";
@@ -529,10 +420,8 @@ function renderIdiomExamples() {
 }
 
 function toggleIdiomMemorizedDetail() {
-  if (!currentIdiomId) return;
   const chk = document.getElementById("idiom-memorized-checkbox");
-  if (chk.checked) memorizedIdioms.add(currentIdiomId);
-  else memorizedIdioms.delete(currentIdiomId);
+  if (chk.checked) memorizedIdioms.add(currentIdiomId); else memorizedIdioms.delete(currentIdiomId);
   saveData('idiom');
   renderIdiomList();
 }
@@ -542,41 +431,23 @@ function playIdiomExamples() {
   if (item) speakText(item.examples.map(e => e.en).join(". "));
 }
 
-
-// --------------------------
-// 7. 대화 (Conversation) 로직
-// --------------------------
+// ==========================================
+// 7. 대화 (Conversation) & 섀도잉
+// ==========================================
 function renderConversationList() {
   const container = document.getElementById("conv-list");
-  if (!container) return;
-  if (typeof conversationData === "undefined") {
-    container.innerHTML = '<div class="list-item"><div>conversation.js 파일이 없습니다.</div></div>';
-    return;
-  }
-
+  if (!container || typeof conversationData === "undefined") return;
   const keyword = (document.getElementById("conv-search")?.value || "").toLowerCase();
   container.innerHTML = "";
-
-  const filtered = conversationData.filter(c => 
-    (c.title + c.lines.map(l => l.en).join(" ") + c.lines.map(l => l.kr).join(" ")).toLowerCase().includes(keyword)
-  );
-
+  const filtered = conversationData.filter(c => (c.title + c.lines.map(l => l.en).join(" ") + c.lines.map(l => l.kr).join(" ")).toLowerCase().includes(keyword));
   currentConvList = filtered;
-
   filtered.forEach(c => {
     const div = document.createElement("div");
     div.className = "list-item";
     div.onclick = () => openConversation(c.id);
-    div.innerHTML = `
-      <div>
-        <div class="list-item-title">${c.title}</div>
-        <div class="list-item-sub">${c.lines[0]?.en || ""}</div>
-      </div>
-      <div>▶</div>
-    `;
+    div.innerHTML = `<div><div class="list-item-title">${c.title}</div><div class="list-item-sub">${c.lines[0]?.en || ""}</div></div><div>▶</div>`;
     container.appendChild(div);
   });
-  
   if (filtered.length === 0) container.innerHTML = '<div class="list-item"><div>검색 결과가 없습니다.</div></div>';
 }
 
@@ -584,7 +455,6 @@ function openConversation(id) {
   currentConvId = id;
   const conv = conversationData.find(c => c.id === id);
   if (!conv) return;
-
   document.getElementById("conv-title").textContent = conv.title;
   document.getElementById("conv-toggle-kr").checked = true;
   renderConversationDetail();
@@ -597,16 +467,10 @@ function renderConversationDetail() {
   const showKr = document.getElementById("conv-toggle-kr").checked;
   const container = document.getElementById("conv-lines");
   container.innerHTML = "";
-
   conv.lines.forEach(line => {
     const row = document.createElement("div");
     row.className = "sentence-row";
-    row.innerHTML = `
-      <div class="sentence-text">
-        <div><b>${line.speaker}:</b> ${line.en}</div>
-        ${showKr ? `<div class="sentence-kr">${line.kr}</div>` : ''}
-      </div>
-    `;
+    row.innerHTML = `<div class="sentence-text"><div><b>${line.speaker}:</b> ${line.en}</div>${showKr ? `<div class="sentence-kr">${line.kr}</div>` : ''}</div>`;
     const btn = document.createElement("button");
     btn.className = "btn small";
     btn.textContent = "▶";
@@ -621,19 +485,14 @@ function playConversationAll() {
   if (conv) speakText(conv.lines.map(l => l.en).join(" "));
 }
 
-// --------------------------
-// 8. 섀도잉 & 이동 헬퍼
-// --------------------------
 let shadowingIndex = 0;
-function initShadowing() {
-  shadowingIndex = 0;
-  updateShadowingText();
-}
+function initShadowing() { shadowingIndex = 0; updateShadowingText(); }
 function updateShadowingText() {
   const conv = conversationData.find(c => c.id === currentConvId);
   const el = document.getElementById("shadowing-text");
-  if (!conv || !conv.lines.length) return el.textContent = "대화 없음";
-  el.textContent = `${conv.lines[shadowingIndex].speaker}: ${conv.lines[shadowingIndex].en}`;
+  if (!conv) return;
+  const line = conv.lines[shadowingIndex];
+  el.textContent = `${line.speaker}: ${line.en}`;
 }
 function playShadowingCurrent() {
   const conv = conversationData.find(c => c.id === currentConvId);
@@ -646,27 +505,24 @@ function nextShadowing() {
   updateShadowingText();
 }
 
+// 이동 헬퍼
 function moveItemInList(currentId, list, offset, openFunc) {
   if (!list || list.length === 0) return;
   const idx = list.findIndex(item => item.id === currentId);
   if (idx === -1) return;
   const nextIdx = idx + offset;
-  if (nextIdx >= 0 && nextIdx < list.length) {
-    openFunc(list[nextIdx].id);
-  } else {
-    alert(offset > 0 ? "마지막 항목입니다." : "첫 번째 항목입니다.");
-  }
+  if (nextIdx >= 0 && nextIdx < list.length) openFunc(list[nextIdx].id);
+  else alert(offset > 0 ? "마지막 항목입니다." : "첫 번째 항목입니다.");
 }
-
 function movePattern(o) { moveItemInList(currentPatternId, currentPatternList, o, openPattern); }
 function moveWord(o) { moveItemInList(currentWordId, currentWordList, o, openWord); }
 function moveIdiom(o) { moveItemInList(currentIdiomId, currentIdiomList, o, openIdiom); }
 function moveConv(o) { moveItemInList(currentConvId, currentConvList, o, openConversation); }
 
 
-// --------------------------
-// 9. 문장 퍼즐 (업그레이드: 패턴 + 대화)
-// --------------------------
+// ==========================================
+// 8. 문장 퍼즐 & 말하기 (Speaking)
+// ==========================================
 let currentPuzzleAnswer = "";
 let puzzleTargetTokens = [];
 let puzzleShuffledTokens = [];
@@ -680,27 +536,21 @@ function nextPuzzle() {
   let pool = [];
   if (typeof conversationData !== "undefined") {
     conversationData.forEach(c => c.lines.forEach(l => {
-      if (l.en.split(" ").length > 2) pool.push({ en: l.en, kr: l.kr, src: "대화: " + c.title });
+      if (l.en.split(" ").length > 2) pool.push({ en: l.en, kr: l.kr, src: "대화" });
     }));
   }
   if (typeof patternData !== "undefined") {
     patternData.forEach(p => p.examples.forEach(ex => {
-      if (ex.en.split(" ").length > 2) pool.push({ en: ex.en, kr: ex.kr, src: "패턴: " + p.title });
+      if (ex.en.split(" ").length > 2) pool.push({ en: ex.en, kr: ex.kr, src: "패턴" });
     }));
   }
-
-  if (pool.length === 0) {
-    document.getElementById("puzzle-question").textContent = "데이터가 부족합니다.";
-    return;
-  }
-
+  if (pool.length === 0) return document.getElementById("puzzle-question").textContent = "데이터 부족";
   const target = pool[Math.floor(Math.random() * pool.length)];
   currentPuzzleAnswer = target.en.trim();
   document.getElementById("puzzle-question").textContent = target.kr;
 
   puzzleTargetTokens = [];
   puzzleShuffledTokens = currentPuzzleAnswer.split(" ").sort(() => Math.random() - 0.5);
-  
   document.getElementById("puzzle-feedback").textContent = "";
   renderPuzzle();
 }
@@ -709,28 +559,25 @@ function renderPuzzle() {
   const bank = document.getElementById("puzzle-bank");
   const target = document.getElementById("puzzle-target");
   bank.innerHTML = ""; target.innerHTML = "";
-
-  // Bank (남은 토큰)
+  
   const currentBank = [...puzzleShuffledTokens];
   puzzleTargetTokens.forEach(t => {
     const idx = currentBank.indexOf(t);
     if (idx > -1) currentBank.splice(idx, 1);
   });
-
-  currentBank.forEach(token => {
+  
+  currentBank.forEach(t => {
     const span = document.createElement("span");
     span.className = "token";
-    span.textContent = token;
-    span.onclick = () => { puzzleTargetTokens.push(token); renderPuzzle(); };
+    span.textContent = t;
+    span.onclick = () => { puzzleTargetTokens.push(t); renderPuzzle(); };
     bank.appendChild(span);
   });
-
-  // Target (선택한 토큰)
-  puzzleTargetTokens.forEach((token, idx) => {
+  puzzleTargetTokens.forEach((t, i) => {
     const span = document.createElement("span");
     span.className = "token";
-    span.textContent = token;
-    span.onclick = () => { puzzleTargetTokens.splice(idx, 1); renderPuzzle(); };
+    span.textContent = t;
+    span.onclick = () => { puzzleTargetTokens.splice(i, 1); renderPuzzle(); };
     target.appendChild(span);
   });
 }
@@ -743,20 +590,13 @@ function checkPuzzle() {
     fb.className = "feedback ok";
     speakText(currentPuzzleAnswer);
   } else {
-    fb.textContent = "오답입니다. 다시 시도해보세요.";
+    fb.textContent = "오답입니다.";
     fb.className = "feedback error";
   }
 }
-function resetPuzzle() {
-  puzzleTargetTokens = [];
-  document.getElementById("puzzle-feedback").textContent = "";
-  renderPuzzle();
-}
+function resetPuzzle() { puzzleTargetTokens = []; document.getElementById("puzzle-feedback").textContent = ""; renderPuzzle(); }
 
-
-// --------------------------
-// 10. 말하기 연습 (Speaking)
-// --------------------------
+// Speaking
 let speakingData = [];
 let currentSpeaking = null;
 let recognition = null;
@@ -767,9 +607,7 @@ function initSpeaking() {
   if (typeof conversationData !== "undefined") {
     conversationData.forEach(c => {
       for (let i=0; i<c.lines.length-1; i++) {
-        if (c.lines[i].en.trim().endsWith("?")) {
-          speakingData.push({ q: c.lines[i], a: c.lines[i+1] });
-        }
+        if (c.lines[i].en.trim().endsWith("?")) speakingData.push({ q: c.lines[i], a: c.lines[i+1] });
       }
     });
   }
@@ -778,71 +616,56 @@ function initSpeaking() {
 }
 
 function initSpeechRecognition() {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) return;
-  recognition = new SpeechRecognition();
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return;
+  recognition = new SR();
   recognition.lang = "en-US";
   recognition.interimResults = false;
-  
   recognition.onstart = () => { isRecording = true; updateMicUI(); };
   recognition.onend = () => { isRecording = false; updateMicUI(); };
   recognition.onresult = (e) => {
     const txt = e.results[0][0].transcript;
-    const box = document.getElementById("user-speech-result");
-    box.textContent = `🗣 내 답변: "${txt}"`;
-    box.classList.remove("hidden");
+    document.getElementById("user-speech-result").textContent = `🗣 내 답변: "${txt}"`;
+    document.getElementById("user-speech-result").classList.remove("hidden");
   };
 }
-
 function toggleRecording() {
-  if (!recognition) return alert("PC 크롬/엣지 브라우저를 사용해주세요.");
+  if (!recognition) return alert("PC 크롬 브라우저를 사용해주세요.");
   if (isRecording) recognition.stop();
   else {
     document.getElementById("user-speech-result").textContent = "";
     recognition.start();
   }
 }
-
 function updateMicUI() {
   const btn = document.getElementById("mic-btn");
-  const status = document.getElementById("mic-status");
-  if (isRecording) {
-    btn.classList.add("recording");
-    status.textContent = "듣고 있습니다...";
-  } else {
-    btn.classList.remove("recording");
-    status.textContent = "버튼을 누르고 말씀하세요.";
-  }
+  const st = document.getElementById("mic-status");
+  if (isRecording) { btn.classList.add("recording"); st.textContent = "듣고 있습니다..."; }
+  else { btn.classList.remove("recording"); st.textContent = "눌러서 말하기"; }
 }
-
 function nextSpeaking() {
   if (speakingData.length === 0) return;
   currentSpeaking = speakingData[Math.floor(Math.random() * speakingData.length)];
-  
   document.getElementById("speaking-q-en").textContent = currentSpeaking.q.en;
   document.getElementById("speaking-q-kr").textContent = currentSpeaking.q.kr;
   document.getElementById("speaking-a-en").textContent = currentSpeaking.a.en;
   document.getElementById("speaking-a-kr").textContent = currentSpeaking.a.kr;
-  
   document.getElementById("speaking-answer-toggle").checked = false;
   toggleSpeakingAnswer();
   document.getElementById("user-speech-result").classList.add("hidden");
 }
-
 function toggleSpeakingAnswer() {
   const chk = document.getElementById("speaking-answer-toggle");
   const area = document.getElementById("speaking-answer-area");
-  if (chk.checked) area.classList.remove("hidden");
-  else area.classList.add("hidden");
+  if (chk.checked) area.classList.remove("hidden"); else area.classList.add("hidden");
 }
-
 function playSpeakingQuestion() { if(currentSpeaking) speakText(currentSpeaking.q.en); }
 function playSpeakingAnswer() { if(currentSpeaking) speakText(currentSpeaking.a.en); }
 
 
-// --------------------------
-// 11. TTS 설정
-// --------------------------
+// ==========================================
+// 9. TTS 설정 및 Firebase 동기화
+// ==========================================
 let ttsVoices = [];
 let userVoiceIndex = null;
 let userRate = 1.0;
@@ -888,14 +711,11 @@ function openSettingsModal() {
   updateRateLabel();
 }
 function closeSettingsModal() { document.getElementById("settings-modal").classList.add("hidden"); }
-function updateRateLabel() {
-  document.getElementById("tts-rate-label").textContent = document.getElementById("tts-rate-range").value + "x";
-}
+function updateRateLabel() { document.getElementById("tts-rate-label").textContent = document.getElementById("tts-rate-range").value + "x"; }
 function previewVoiceSettings() {
   updateRateLabel();
   const tempVoice = document.getElementById("tts-voice-select").value;
   const tempRate = document.getElementById("tts-rate-range").value;
-  
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance("Hello, voice test.");
   u.lang = "en-US";
@@ -910,179 +730,92 @@ function saveSettings() {
   closeSettingsModal();
 }
 
-
-// --------------------------
-// 12. 초기화 (Initialization)
-// --------------------------
-loadMemorizedData();
-loadVoices();
-
-// 초기 데이터 로드 상태 반영
-if (typeof patternData !== "undefined") updatePatternProgress();
-if (typeof wordData !== "undefined") updateWordProgress();
-if (typeof idiomData !== "undefined") updateIdiomProgress();
-
-// 홈 화면으로 이동
-goTo("home");
-
-
-// ==========================================
-// 13. Firebase 데이터 동기화 로직
-// ==========================================
-
-// ⚠️ 1단계에서 복사한 'firebaseConfig' 내용을 여기에 덮어쓰세요!
+// ⚠️ YOUR_API_KEY 부분을 본인 Firebase 키로 바꾸세요!
 const firebaseConfig = {
-  apiKey: "AIzaSyCdr88Bomc9SQzZBj03iih3epxivhPL63I",
-  authDomain: "engo-9c8e3.firebaseapp.com",
-  projectId: "engo-9c8e3",
-  storageBucket: "engo-9c8e3.firebasestorage.app",
-  messagingSenderId: "252712209702",
-  appId: "1:252712209702:web:5ed2ccb9f07230824d45e7",
-  measurementId: "G-KHE07H3HKR"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
 
-// Firebase 초기화
 let db;
 if (typeof firebase !== "undefined") {
-  try {
-    firebase.initializeApp(firebaseConfig);
-    db = firebase.firestore();
-    console.log("Firebase 연결 성공");
-  } catch (e) {
-    console.error("Firebase 초기화 실패:", e);
-  }
+  try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); } catch (e) { console.error(e); }
 }
 
-// 모달 열기/닫기
 function openSyncModal() {
-  const modal = document.getElementById("sync-modal");
-  if (modal) modal.classList.remove("hidden");
-  // 마지막 사용 ID 자동 입력
+  document.getElementById("sync-modal").classList.remove("hidden");
   const lastId = localStorage.getItem("lastSyncId");
-  if (lastId) document.getElementById("sync-id").value = lastId;
+  if(lastId) document.getElementById("sync-id").value = lastId;
 }
+function closeSyncModal() { document.getElementById("sync-modal").classList.add("hidden"); }
 
-function closeSyncModal() {
-  document.getElementById("sync-modal").classList.add("hidden");
-}
-
-// ⬆ 데이터 업로드 (저장)
 async function uploadData() {
   const id = document.getElementById("sync-id").value.trim();
   const pw = document.getElementById("sync-pw").value.trim();
-
-  if (!id || !pw) return alert("ID와 비밀번호를 모두 입력해주세요.");
-  if (!db) return alert("데이터베이스 연결 실패 (Config 설정을 확인하세요)");
-
+  if(!id || !pw) return alert("ID/비번 입력 필요");
+  if(!db) return alert("DB 연결 실패");
   try {
-    const docRef = db.collection("users").doc(id);
-    const doc = await docRef.get();
-
-    // 이미 있는 ID라면 비밀번호 확인
-    if (doc.exists) {
-      const remotePw = doc.data().password;
-      if (remotePw !== pw) {
-        return alert("비밀번호가 일치하지 않습니다.\n본인 ID가 아니라면 다른 ID를 사용해주세요.");
-      }
-      if (!confirm("서버의 기존 데이터를 현재 데이터로 덮어쓰시겠습니까?")) return;
+    const ref = db.collection("users").doc(id);
+    const doc = await ref.get();
+    if(doc.exists) {
+      if(doc.data().password !== pw) return alert("비밀번호 불일치");
+      if(!confirm("덮어쓰시겠습니까?")) return;
     } else {
-      // 새로운 ID
-      if (!confirm(`'${id}' 계정을 새로 만듭니다. 저장하시겠습니까?`)) return;
+      if(!confirm("새 계정입니다. 생성할까요?")) return;
     }
-
-    // 저장할 데이터 뭉치기
-    const payload = {
+    await ref.set({
       password: pw,
-      lastUpdated: new Date().toISOString(),
+      updated: new Date().toISOString(),
       patterns: Array.from(memorizedPatterns),
       words: Array.from(memorizedWords),
       idioms: Array.from(memorizedIdioms),
-      settings: {
-        voiceIndex: userVoiceIndex,
-        rate: userRate
-      }
-    };
-
-    await docRef.set(payload);
-    
+      settings: { voiceIndex: userVoiceIndex, rate: userRate }
+    });
     localStorage.setItem("lastSyncId", id);
-    alert("✅ 저장 완료! (서버에 안전하게 보관되었습니다)");
+    alert("✅ 저장 완료");
     closeSyncModal();
-
-  } catch (e) {
-    console.error(e);
-    alert("저장 실패: " + e.message);
-  }
+  } catch(e) { alert("오류: " + e.message); }
 }
 
-// ⬇ 데이터 다운로드 (불러오기)
-// ⬇ 데이터 다운로드 (진단 모드)
 async function downloadData() {
   const id = document.getElementById("sync-id").value.trim();
   const pw = document.getElementById("sync-pw").value.trim();
-
-  if (!id || !pw) return alert("ID와 비밀번호를 입력해주세요.");
-  if (!db) return alert("데이터베이스 연결 객체(db)가 없습니다.");
-
+  if(!id || !pw) return alert("ID/비번 입력 필요");
+  if(!db) return alert("DB 연결 실패");
   try {
-    alert("1단계: 서버에서 ID 검색을 시작합니다...");
-    const docRef = db.collection("users").doc(id);
-    const doc = await docRef.get();
-
-    if (!doc.exists) {
-      return alert("❌ 실패: 서버에 해당 ID(" + id + ")가 존재하지 않습니다. 저장이 제대로 안 되었을 수 있습니다.");
-    }
-
-    alert("2단계: ID를 찾았습니다! 비밀번호를 확인합니다...");
-    const data = doc.data();
+    const ref = db.collection("users").doc(id);
+    const doc = await ref.get();
+    if(!doc.exists) return alert("ID 없음");
+    if(doc.data().password !== pw) return alert("비번 불일치");
+    if(!confirm("복구하시겠습니까?")) return;
+    const d = doc.data();
+    if(d.patterns) memorizedPatterns = new Set(d.patterns);
+    if(d.words) memorizedWords = new Set(d.words);
+    if(d.idioms) memorizedIdioms = new Set(d.idioms);
+    if(d.settings) { userVoiceIndex = d.settings.voiceIndex; userRate = d.settings.rate; }
     
-    // 디버깅을 위해 서버에 저장된 비밀번호를 콘솔에 출력 (F12 눌러서 확인 가능)
-    console.log("서버 비번:", data.password, "입력 비번:", pw);
-
-    if (String(data.password) !== String(pw)) {
-      return alert("❌ 실패: 비밀번호가 일치하지 않습니다.");
-    }
-
-    alert("3단계: 비밀번호 일치! 데이터를 내 기기로 가져옵니다...");
-
-    if (!confirm("현재 기기의 데이터를 삭제하고, 서버 데이터로 복구하시겠습니까?")) return;
-
-    // 데이터 복구 시도
-    if (data.patterns) memorizedPatterns = new Set(data.patterns);
-    if (data.words) memorizedWords = new Set(data.words);
-    if (data.idioms) memorizedIdioms = new Set(data.idioms);
-    
-    if (data.settings) {
-      userVoiceIndex = data.settings.voiceIndex;
-      userRate = data.settings.rate;
-    }
-
-    alert("4단계: 데이터 로드 완료. 화면을 갱신합니다...");
-
-    // 로컬 스토리지 저장 함수가 존재하는지 확인
-    if (typeof saveData !== "function") throw new Error("'saveData' 함수가 없습니다.");
-
-    saveData('pattern');
-    saveData('word');
-    saveData('idiom');
+    saveData('pattern'); saveData('word'); saveData('idiom');
     localStorage.setItem("ttsSettings", JSON.stringify({ voiceIndex: userVoiceIndex, rate: userRate }));
     localStorage.setItem("lastSyncId", id);
-
-    // 화면 갱신 함수들이 존재하는지 확인
-    if (typeof updatePatternProgress === "function") updatePatternProgress();
-    if (typeof updateWordProgress === "function") updateWordProgress();
-    if (typeof updateIdiomProgress === "function") updateIdiomProgress();
     
-    // 현재 보고 있는 화면 리프레시
-    const currentPage = pages.find(p => !document.getElementById("page-" + p).classList.contains("hidden"));
-    if (currentPage) goTo(currentPage);
-
-    alert("✅ 성공: 모든 데이터를 정상적으로 불러왔습니다!");
+    updatePatternProgress(); updateWordProgress(); updateIdiomProgress();
+    const curr = pages.find(p => !document.getElementById("page-"+p).classList.contains("hidden"));
+    if(curr) goTo(curr);
+    
+    alert("✅ 복구 완료");
     closeSyncModal();
-
-  } catch (e) {
-    console.error(e); // F12 콘솔에서 자세한 에러 확인 가능
-    alert("❌ 에러 발생: " + e.message);
-  }
+  } catch(e) { alert("오류: " + e.message); }
 }
 
+// --------------------------
+// 10. 초기화 (Initialization)
+// --------------------------
+loadMemorizedData();
+loadVoices();
+if (typeof patternData !== "undefined") updatePatternProgress();
+if (typeof wordData !== "undefined") updateWordProgress();
+if (typeof idiomData !== "undefined") updateIdiomProgress();
+goTo("home");
