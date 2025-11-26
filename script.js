@@ -1,25 +1,4 @@
 // ==========================================
-// 🚨 카카오톡 인앱 브라우저 탈출 및 초기 설정
-// ==========================================
-(function() {
-  const ua = navigator.userAgent.toLowerCase();
-  const url = location.href;
-  if (ua.indexOf('kakaotalk') > -1) {
-    if (ua.indexOf('android') > -1) {
-      location.href = 'intent://' + url.replace(/https?:\/\//i, '') + '#Intent;scheme=https;package=com.android.chrome;end';
-    } else if (ua.indexOf('iphone') > -1 || ua.indexOf('ipad') > -1) {
-      const style = document.createElement('style');
-      style.innerHTML = `body { margin: 0; padding: 0; overflow: hidden; } #kakao-guide { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 99999; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; text-align: center; font-family: sans-serif; } .arrow { font-size: 40px; animation: bounce 1s infinite; } @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }`;
-      document.head.appendChild(style);
-      const guide = document.createElement('div');
-      guide.id = 'kakao-guide';
-      guide.innerHTML = `<div class="arrow">↗️</div><p><strong>카카오톡 브라우저에서는<br>저장 기능이 작동하지 않습니다.</strong></p><p>오른쪽 하단(또는 상단)의<br><strong>[점 3개 ...]</strong> 메뉴를 누르고</p><p><span style="color:#FEE500; font-weight:bold;">[다른 브라우저로 열기]</span>를<br>선택해주세요.</p>`;
-      document.body.appendChild(guide);
-    }
-  }
-})();
-
-// ==========================================
 // 1. 전역 변수 및 데이터 준비
 // ==========================================
 const pages = [
@@ -820,4 +799,5 @@ if (typeof patternData !== "undefined") updatePatternProgress();
 if (typeof wordData !== "undefined") updateWordProgress();
 if (typeof idiomData !== "undefined") updateIdiomProgress();
 goTo("home");
+
 
