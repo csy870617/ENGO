@@ -794,3 +794,103 @@ h2 {
   color: #fdfcff;
   border-color: #4c1d95;
 }
+
+/* =========================
+   말하기 (Speaking) 전용 스타일
+   ========================= */
+
+/* 둥근 마이크 버튼 */
+.mic-button {
+  width: 70px;
+  height: 70px;
+  background: white;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  font-size: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(139, 92, 246, 0.3);
+  transition: all 0.2s ease;
+}
+
+.mic-button:hover {
+  transform: scale(1.05);
+  background: #fdfcff;
+}
+
+/* 녹음 중일 때 스타일 (빨간색 + 파동 애니메이션) */
+.mic-button.recording {
+  background: #fee2e2;
+  border-color: #ef4444;
+  color: #b91c1c;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+/* 내 답변 텍스트 박스 */
+.speech-result-box {
+  margin-top: 16px;
+  padding: 12px;
+  background: #f9fafb;
+  border: 1px dashed #d1d5db;
+  border-radius: 12px;
+  font-size: 15px;
+  color: #4b5563;
+  min-height: 40px;
+}
+
+/* =========================
+   모달 (팝업) - 화면 중앙 정렬 수정
+   ========================= */
+
+.modal-overlay {
+  position: fixed;
+  top: 0; 
+  left: 0; 
+  right: 0; 
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5); /* 반투명 검은 배경 */
+  z-index: 9999; /* 다른 요소들보다 무조건 위에 */
+  
+  /* 🔽 화면 정중앙 배치를 위한 핵심 코드 */
+  display: flex;
+  align-items: center;    /* 수직 중앙 */
+  justify-content: center;/* 수평 중앙 */
+  
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+/* 모달이 숨겨졌을 때 (부드럽게 사라지기) */
+.modal-overlay.hidden {
+  opacity: 0;
+  pointer-events: none; /* 클릭 방지 */
+  visibility: hidden;   /* 화면에서 안 보이게 */
+}
+
+.modal-content {
+  background: #fff;
+  width: 90%;          /* 모바일에서는 화면 꽉 차게 */
+  max-width: 400px;    /* PC에서는 최대 400px까지만 */
+  padding: 24px;
+  border-radius: 20px; /* 둥근 모서리 */
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  
+  /* 🔽 아래에서 위로 살짝 올라오는 애니메이션 */
+  transform: translateY(0);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* 숨겨져 있을 때는 살짝 아래에 위치 */
+.modal-overlay.hidden .modal-content {
+  transform: translateY(20px);
+}
+
