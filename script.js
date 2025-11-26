@@ -874,3 +874,148 @@ if (typeof idiomData !== "undefined") updateIdiomProgress();
 
 // 홈 화면으로 이동
 goTo("home");
+
+
+// ==========================================
+// 13. Firebase 데이터 동기화 로직
+// ==========================================
+
+// ⚠️ 1단계에서 복사한 'firebaseConfig' 내용을 여기에 덮어쓰세요!
+const firebaseConfig = {
+  apiKey: "AIzaSyCdr88Bomc9SQzZBj03iih3epxivhPL63I",
+  authDomain: "engo-9c8e3.firebaseapp.com",
+  projectId: "engo-9c8e3",
+  storageBucket: "engo-9c8e3.firebasestorage.app",
+  messagingSenderId: "252712209702",
+  appId: "1:252712209702:web:5ed2ccb9f07230824d45e7",
+  measurementId: "G-KHE07H3HKR"
+};
+
+// Firebase 초기화
+let db;
+if (typeof firebase !== "undefined") {
+  try {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    console.log("Firebase 연결 성공");
+  } catch (e) {
+    console.error("Firebase 초기화 실패:", e);
+  }
+}
+
+// 모달 열기/닫기
+function openSyncModal() {
+  const modal = document.getElementById("sync-modal");
+  if (modal) modal.classList.remove("hidden");
+  // 마지막 사용 ID 자동 입력
+  const lastId = localStorage.getItem("lastSyncId");
+  if (lastId) document.getElementById("sync-id").value = lastId;
+}
+
+function closeSyncModal() {
+  document.getElementById("sync-modal").classList.add("hidden");
+}
+
+// ⬆ 데이터 업로드 (저장)
+async function uploadData() {
+  const id = document.getElementById("sync-id").value.trim();
+  const pw = document.getElementById("sync-pw").value.trim();
+
+  if (!id || !pw) return alert("ID와 비밀번호를 모두 입력해주세요.");
+  if (!db) return alert("데이터베이스 연결 실패 (Config 설정을 확인하세요)");
+
+  try {
+    const docRef = db.collection("users").doc(id);
+    const doc = await docRef.get();
+
+    // 이미 있는 ID라면 비밀번호 확인
+    if (doc.exists) {
+      const remotePw = doc.data().password;
+      if (remotePw !== pw) {
+        return alert("비밀번호가 일치하지 않습니다.\n본인 ID가 아니라면 다른 ID를 사용해주세요.");
+      }
+      if (!confirm("서버의 기존 데이터를 현재 데이터로 덮어쓰시겠습니까?")) return;
+    } else {
+      // 새로운 ID
+      if (!confirm(`'${id}' 계정을 새로 만듭니다. 저장하시겠습니까?`)) return;
+    }
+
+    // 저장할 데이터 뭉치기
+    const payload = {
+      password: pw,
+      lastUpdated: new Date().toISOString(),
+      patterns: Array.from(memorizedPatterns),
+      words: Array.from(memorizedWords),
+      idioms: Array.from(memorizedIdioms),
+      settings: {
+        voiceIndex: userVoiceIndex,
+        rate: userRate
+      }
+    };
+
+    await docRef.set(payload);
+    
+    localStorage.setItem("lastSyncId", id);
+    alert("✅ 저장 완료! (서버에 안전하게 보관되었습니다)");
+    closeSyncModal();
+
+  } catch (e) {
+    console.error(e);
+    alert("저장 실패: " + e.message);
+  }
+}
+
+// ⬇ 데이터 다운로드 (불러오기)
+async function downloadData() {
+  const id = document.getElementById("sync-id").value.trim();
+  const pw = document.getElementById("sync-pw").value.trim();
+
+  if (!id || !pw) return alert("ID와 비밀번호를 입력해주세요.");
+  if (!db) return alert("데이터베이스 연결 실패");
+
+  try {
+    const docRef = db.collection("users").doc(id);
+    const doc = await docRef.get();
+
+    if (!doc.exists) return alert("존재하지 않는 ID입니다.");
+
+    const data = doc.data();
+    if (data.password !== pw) return alert("비밀번호가 틀렸습니다.");
+
+    if (!confirm("현재 기기의 데이터를 삭제하고, 서버 데이터로 복구하시겠습니까?")) return;
+
+    // 1. 학습 데이터 복구
+    if (data.patterns) memorizedPatterns = new Set(data.patterns);
+    if (data.words) memorizedWords = new Set(data.words);
+    if (data.idioms) memorizedIdioms = new Set(data.idioms);
+    
+    // 2. 설정 데이터 복구
+    if (data.settings) {
+      userVoiceIndex = data.settings.voiceIndex;
+      userRate = data.settings.rate;
+    }
+
+    // 3. 로컬 스토리지 업데이트
+    saveData('pattern');
+    saveData('word');
+    saveData('idiom');
+    localStorage.setItem("ttsSettings", JSON.stringify({ voiceIndex: userVoiceIndex, rate: userRate }));
+    localStorage.setItem("lastSyncId", id);
+
+    // 4. 화면 갱신
+    updatePatternProgress();
+    updateWordProgress();
+    updateIdiomProgress();
+    
+    // 현재 보고 있는 화면 리프레시
+    const currentPage = pages.find(p => !document.getElementById("page-" + p).classList.contains("hidden"));
+    if (currentPage) goTo(currentPage);
+
+    alert("✅ 복구 완료! (서버 데이터를 불러왔습니다)");
+    closeSyncModal();
+
+  } catch (e) {
+    console.error(e);
+    alert("불러오기 실패: " + e.message);
+  }
+}
