@@ -198,6 +198,9 @@ function openPattern(id) {
   document.getElementById("pattern-toggle-kr").checked = true;
   renderPatternExamples();
   goTo("pattern-detail");
+
+  // 🔊 [수정] 딜레이 없이 즉시 실행 (브라우저 차단 방지)
+  playPatternExamples();
 }
 
 function renderPatternExamples() {
@@ -312,6 +315,10 @@ function openWord(id) {
   document.getElementById("word-toggle-kr").checked = true;
   renderWordExamples();
   goTo("word-detail");
+
+  // 🔊 [수정] 즉시 실행
+  const textToRead = `${w.word}. ${w.examples.map(e => e.en).join(". ")}`;
+  speakText(textToRead);
 }
 
 function renderWordExamples() {
@@ -414,6 +421,10 @@ function openIdiom(id) {
   document.getElementById("idiom-toggle-kr").checked = true;
   renderIdiomExamples();
   goTo("idiom-detail");
+
+  // 🔊 [수정] 즉시 실행
+  const textToRead = `${item.idiom}. ${item.examples.map(e => e.en).join(". ")}`;
+  speakText(textToRead);
 }
 
 function renderIdiomExamples() {
@@ -475,6 +486,9 @@ function openConversation(id) {
   document.getElementById("conv-toggle-kr").checked = true;
   renderConversationDetail();
   goTo("conv-detail");
+
+  // 🔊 [수정] 즉시 실행
+  playConversationAll();
 }
 
 function renderConversationDetail() {
@@ -681,12 +695,13 @@ function playSpeakingAnswer() { if(currentSpeaking) speakText(currentSpeaking.a.
 
 
 // ==========================================
-// 9. TTS 설정 및 Firebase 동기화
+// 9. TTS 설정 및 Firebase 인증/자동저장
 // ==========================================
 let ttsVoices = [];
 let userVoiceIndex = null;
 let userRate = 1.0;
 
+// TTS 설정 로드
 function loadVoices() {
   ttsVoices = window.speechSynthesis.getVoices();
   const sel = document.getElementById("tts-voice-select");
@@ -719,6 +734,7 @@ function speakText(text) {
   window.speechSynthesis.speak(u);
 }
 
+// 설정 모달 관련
 function openSettingsModal() {
   document.getElementById("settings-modal").classList.remove("hidden");
   const sel = document.getElementById("tts-voice-select");
@@ -747,94 +763,176 @@ function saveSettings() {
   closeSettingsModal();
 }
 
-// ⚠️ [중요] 아래 YOUR_API_KEY 부분을 본인의 Firebase 설정값으로 꼭 수정하세요!
+// ---------------------------------------------------------
+// 🔥 [핵심 변경] Firebase 인증 및 자동 동기화
+// ---------------------------------------------------------
+
+// ⚠️ 본인의 Firebase 키로 반드시 교체하세요!
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyCdr88Bomc9SQzZBj03iih3epxivhPL63I",
+  authDomain: "engo-9c8e3.firebaseapp.com",
+  projectId: "engo-9c8e3",
+  storageBucket: "engo-9c8e3.firebasestorage.app",
+  messagingSenderId: "252712209702",
+  appId: "1:252712209702:web:5ed2ccb9f07230824d45e7",
+  measurementId: "G-KHE07H3HKR"
 };
 
-let db;
+let db, auth;
+let currentUser = null; // 현재 로그인한 유저 정보
+
 if (typeof firebase !== "undefined") {
-  try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); } catch (e) { console.error(e); }
-}
-
-function openSyncModal() {
-  document.getElementById("sync-modal").classList.remove("hidden");
-  const lastId = localStorage.getItem("lastSyncId");
-  if(lastId) document.getElementById("sync-id").value = lastId;
-}
-function closeSyncModal() { document.getElementById("sync-modal").classList.add("hidden"); }
-
-async function uploadData() {
-  const id = document.getElementById("sync-id").value.trim();
-  const pw = document.getElementById("sync-pw").value.trim();
-  if(!id || !pw) return alert("ID/비번 입력 필요");
-  if(!db) return alert("DB 연결 실패");
   try {
-    const ref = db.collection("users").doc(id);
-    const doc = await ref.get();
-    if(doc.exists) {
-      if(doc.data().password !== pw) return alert("비밀번호 불일치");
-      if(!confirm("덮어쓰시겠습니까?")) return;
-    } else {
-      if(!confirm("새 계정입니다. 생성할까요?")) return;
-    }
-    await ref.set({
-      password: pw,
-      updated: new Date().toISOString(),
-      patterns: Array.from(memorizedPatterns),
-      words: Array.from(memorizedWords),
-      idioms: Array.from(memorizedIdioms),
-      settings: { voiceIndex: userVoiceIndex, rate: userRate }
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    auth = firebase.auth();
+    
+    // 로그인 상태 변화 감지 (앱 켜질 때 자동 실행)
+    auth.onAuthStateChanged((user) => {
+      if (user) {
+        // 로그인 됨
+        currentUser = user;
+        updateAuthUI(true);
+        loadDataFromCloud(); // 클라우드 데이터 불러오기
+      } else {
+        // 로그아웃 됨
+        currentUser = null;
+        updateAuthUI(false);
+      }
     });
-    localStorage.setItem("lastSyncId", id);
-    alert("✅ 저장 완료");
-    closeSyncModal();
-  } catch(e) { alert("오류: " + e.message); }
+  } catch (e) { console.error("Firebase Init Error:", e); }
 }
 
-async function downloadData() {
-  const id = document.getElementById("sync-id").value.trim();
-  const pw = document.getElementById("sync-pw").value.trim();
-  if(!id || !pw) return alert("ID/비번 입력 필요");
-  if(!db) return alert("DB 연결 실패");
+// 구글 로그인
+function googleLogin() {
+  if (!auth) return alert("Firebase 설정 오류");
+  const provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider).catch((error) => {
+    alert("로그인 실패: " + error.message);
+  });
+}
+
+// 로그아웃
+function googleLogout() {
+  if (!auth) return;
+  auth.signOut().then(() => {
+    alert("로그아웃 되었습니다.");
+    location.reload(); // 데이터 초기화를 위해 새로고침
+  });
+}
+
+// UI 업데이트
+function updateAuthUI(isLoggedIn) {
+  const btnLogin = document.getElementById("btn-login");
+  const userProfile = document.getElementById("user-profile");
+  const userPhoto = document.getElementById("user-photo");
+
+  if (isLoggedIn && currentUser) {
+    btnLogin.classList.add("hidden");
+    userProfile.classList.remove("hidden");
+    userProfile.style.display = "flex"; // flex 속성 강제
+    userPhoto.src = currentUser.photoURL || "https://via.placeholder.com/32";
+  } else {
+    btnLogin.classList.remove("hidden");
+    userProfile.classList.add("hidden");
+    userProfile.style.display = "none";
+  }
+}
+
+// 데이터 저장 (로컬 + 클라우드 동시 저장)
+// saveData() 함수는 기존 로직에서 호출될 때 이 함수가 실행됨
+function saveData(type) {
+  // 1. 로컬 저장 (기본)
+  if (type === 'pattern') localStorage.setItem("patternMemorizedIds", JSON.stringify(Array.from(memorizedPatterns)));
+  if (type === 'word') localStorage.setItem("wordMemorizedIds", JSON.stringify(Array.from(memorizedWords)));
+  if (type === 'idiom') localStorage.setItem("idiomMemorizedIds", JSON.stringify(Array.from(memorizedIdioms)));
+
+  // 진행률 업데이트
+  if (type === 'pattern') updatePatternProgress();
+  if (type === 'word') updateWordProgress();
+  if (type === 'idiom') updateIdiomProgress();
+
+  // 2. 클라우드 자동 저장 (로그인 상태일 때만)
+  if (currentUser && db) {
+    const docRef = db.collection("users").doc(currentUser.uid);
+    
+    // 변경된 데이터만 부분 업데이트 (merge)
+    let updateData = {};
+    if (type === 'pattern') updateData.patterns = Array.from(memorizedPatterns);
+    if (type === 'word') updateData.words = Array.from(memorizedWords);
+    if (type === 'idiom') updateData.idioms = Array.from(memorizedIdioms);
+    updateData.updatedAt = new Date().toISOString();
+
+    // set({ ... }, { merge: true })를 써서 기존 필드 보존
+    docRef.set(updateData, { merge: true }).then(() => {
+      console.log(`[Cloud] ${type} saved.`);
+    }).catch((err) => console.error("Cloud save error:", err));
+  }
+}
+
+// 클라우드에서 데이터 불러오기 (로그인 시 1회 실행)
+async function loadDataFromCloud() {
+  if (!currentUser || !db) return;
+  
   try {
-    const ref = db.collection("users").doc(id);
-    const doc = await ref.get();
-    if(!doc.exists) return alert("ID 없음");
-    if(doc.data().password !== pw) return alert("비번 불일치");
-    if(!confirm("복구하시겠습니까?")) return;
-    const d = doc.data();
-    if(d.patterns) memorizedPatterns = new Set(d.patterns);
-    if(d.words) memorizedWords = new Set(d.words);
-    if(d.idioms) memorizedIdioms = new Set(d.idioms);
-    if(d.settings) { userVoiceIndex = d.settings.voiceIndex; userRate = d.settings.rate; }
-    
-    saveData('pattern'); saveData('word'); saveData('idiom');
-    localStorage.setItem("ttsSettings", JSON.stringify({ voiceIndex: userVoiceIndex, rate: userRate }));
-    localStorage.setItem("lastSyncId", id);
-    
-    updatePatternProgress(); updateWordProgress(); updateIdiomProgress();
-    const curr = pages.find(p => !document.getElementById("page-"+p).classList.contains("hidden"));
-    if(curr) goTo(curr);
-    
-    alert("✅ 복구 완료");
-    closeSyncModal();
-  } catch(e) { alert("오류: " + e.message); }
+    const docRef = db.collection("users").doc(currentUser.uid);
+    const doc = await docRef.get();
+
+    if (doc.exists) {
+      const data = doc.data();
+      
+      // 클라우드 데이터가 있으면 로컬 변수 덮어쓰기
+      if (data.patterns) memorizedPatterns = new Set(data.patterns);
+      if (data.words) memorizedWords = new Set(data.words);
+      if (data.idioms) memorizedIdioms = new Set(data.idioms);
+      
+      // 로컬 스토리지도 동기화
+      localStorage.setItem("patternMemorizedIds", JSON.stringify(Array.from(memorizedPatterns)));
+      localStorage.setItem("wordMemorizedIds", JSON.stringify(Array.from(memorizedWords)));
+      localStorage.setItem("idiomMemorizedIds", JSON.stringify(Array.from(memorizedIdioms)));
+
+      // 화면 갱신
+      updatePatternProgress();
+      updateWordProgress();
+      updateIdiomProgress();
+      
+      // 현재 보고 있는 리스트가 있다면 갱신
+      const currPage = history.state ? history.state.page : 'home';
+      if (currPage === 'patterns') renderPatternList();
+      if (currPage === 'words') renderWordList();
+      if (currPage === 'idioms') renderIdiomList();
+      
+      console.log("Data synced from cloud.");
+    } else {
+      // 클라우드에 데이터가 없는 경우 (첫 로그인) -> 현재 로컬 데이터를 클라우드에 업로드
+      console.log("New user. Uploading local data...");
+      saveData('pattern');
+      saveData('word');
+      saveData('idiom');
+    }
+  } catch (e) {
+    console.error("Load data error:", e);
+  }
 }
 
 // ==========================================
-// 10. 초기화 (Initialization)
+// 12. TTS 엔진 깨우기 및 초기화
 // ==========================================
-// 🔽 [추가] 첫 진입 시 초기 히스토리 설정 (뒤로 가기 방지)
-history.replaceState({ page: 'home' }, "", "#home");
+document.body.addEventListener('click', function unlockTTS() {
+  if (window.speechSynthesis) {
+    const u = new SpeechSynthesisUtterance(""); 
+    u.volume = 0; 
+    window.speechSynthesis.speak(u);
+  }
+  document.body.removeEventListener('click', unlockTTS);
+}, { once: true });
 
+// 초기화 실행
 loadMemorizedData();
 loadVoices();
+if (!history.state) {
+  history.replaceState({ page: 'home' }, "", "#home");
+}
 if (typeof patternData !== "undefined") updatePatternProgress();
 if (typeof wordData !== "undefined") updateWordProgress();
 if (typeof idiomData !== "undefined") updateIdiomProgress();
