@@ -271,12 +271,23 @@
       </div>
     </section>
 
-    <section id="page-speaking" class="hidden">
-      <div class="nav-header"><span class="back-btn" onclick="goTo('home')">❮ 나가기</span></div>
-      <div class="game-card">
-        <h2>🎙️ 말하기 연습</h2>
-        <div class="speech-bubble">
-          <p class="label">Q. 질문</p>
+<section id="page-speaking" class="hidden">
+      <div class="page-title-row">
+        <span class="back-link" onclick="goTo('home')">← 홈으로</span>
+      </div>
+
+      <div class="card">
+        <h2>말하기 연습 (Speaking)</h2>
+        <p class="subtext">질문을 듣고 마이크 버튼을 눌러 대답해보세요.</p>
+        
+        <div class="toggle-row" style="margin-top: 12px;">
+          <label>
+            <input type="checkbox" id="speaking-autoplay-toggle" /> 🔊 질문 자동 재생
+          </label>
+        </div>
+        </div>
+      <div class="card">
+
           <p id="speaking-q-en" class="en-text">Question?</p>
           <p id="speaking-q-kr" class="kr-text">해석...</p>
           <div style="text-align: center; margin: 30px 0;">
@@ -293,7 +304,7 @@
 
         <div class="mic-area">
           <div id="mic-btn" class="mic-btn" onclick="toggleRecording()">🎤</div>
-          <p id="mic-status">마이크를 누르고 대답하세요</p>
+
         </div>
         <div id="user-speech-result" class="result-box hidden"></div>
 
