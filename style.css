@@ -299,3 +299,66 @@ main {
   font-size: 0.85rem; cursor: pointer; transition: 0.2s;
 }
 .toggle-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+/* ... (기존 CSS 내용 유지) ... */
+
+/* [신규] 앱 설치 배너 스타일 */
+.install-banner {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  width: 90%; max-width: 400px;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid var(--primary);
+  backdrop-filter: blur(10px);
+  padding: 16px 20px; border-radius: 16px;
+  display: flex; justify-content: space-between; align-items: center;
+  z-index: 3000; box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+  animation: slideUp 0.5s ease-out;
+}
+
+@keyframes slideUp {
+  from { transform: translate(-50%, 100px); opacity: 0; }
+  to { transform: translate(-50%, 0); opacity: 1; }
+}
+
+.install-content {
+  display: flex; flex-direction: column; gap: 4px;
+}
+
+.install-title { font-weight: 700; color: #fff; font-size: 1rem; }
+.install-desc { color: var(--text-sub); font-size: 0.8rem; }
+
+.install-btn {
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  border: none; color: #fff; padding: 8px 16px; border-radius: 20px;
+  font-weight: 600; font-size: 0.9rem; cursor: pointer;
+  box-shadow: 0 4px 10px rgba(139, 92, 246, 0.3);
+}
+
+.install-close {
+  background: none; border: none; color: var(--text-sub);
+  font-size: 1.2rem; cursor: pointer; margin-left: 10px;
+}
+
+/* ... 기존 CSS 유지 ... */
+
+/* [신규] 공유 버튼 스타일 */
+.share-btn {
+  margin-top: 15px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--primary);
+  color: var(--accent);
+  padding: 10px 20px;
+  border-radius: 25px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
+  display: inline-flex; align-items: center; gap: 6px;
+  transition: 0.3s;
+}
+
+.share-btn:hover {
+  background: var(--primary);
+  color: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(139, 92, 246, 0.4);
+}
