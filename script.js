@@ -699,6 +699,13 @@ function nextSpeaking() {
   toggleSpeakingAnswer();
   document.getElementById("user-speech-result").classList.add("hidden");
 
+  // ▼ [수정됨] 자동 재생 체크박스 상태 확인 후 재생
+  const autoPlay = document.getElementById("speaking-autoplay-toggle").checked;
+  if (autoPlay) {
+    playSpeakingQuestion();
+  }
+
+
   // 🔊 [추가] 질문 자동 재생 (설정이 켜져 있을 때만)
   if (autoPlayEnabled) {
     playSpeakingQuestion();
