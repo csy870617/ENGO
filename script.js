@@ -1189,19 +1189,9 @@ window.addEventListener('appinstalled', () => {
 // ==========================================
 const KAKAO_JS_KEY = '7e17cb2ba4738f9e3cd710879d487959'; 
 
-if (typeof Kakao !== 'undefined' && KAKAO_JS_KEY !== '7e17cb2ba4738f9e3cd710879d487959') {
-  try {
-    if (!Kakao.isInitialized()) {
-      Kakao.init(KAKAO_JS_KEY);
-    }
-  } catch(e) {
-    console.log("Kakao init failed", e);
-  }
-}
-
 function shareApp() {
   // 1. 카카오톡 공유
-if (typeof Kakao !== 'undefined' && Kakao.isInitialized()) {
+  if (typeof Kakao !== 'undefined' && Kakao.isInitialized()) {
     try {
       Kakao.Share.sendDefault({
         objectType: 'feed',
@@ -1250,11 +1240,125 @@ if (typeof Kakao !== 'undefined' && Kakao.isInitialized()) {
   }
 }
 
+// ==========================================
+// 16. [수정됨] 실시간 영어 뉴스 로더 (API 연동)
+// ==========================================
+
+// 구글 뉴스 RSS (검색어: South Korea + Culture/Tech/Travel)
+// -> 긍정적이고 흥미로운 주제 위주로 필터링된 최신 기사를 가져옵니다.
+const RSS_URL = "https://news.google.com/rss/search?q=South+Korea+(culture+OR+technology+OR+travel)+when:7d&hl=en-US&gl=US&ceid=US:en";
+const API_URL = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(RSS_URL)}`;
+
+async function fetchRealNews() {
+  const container = document.getElementById('news-card-list');
+  const badge = document.querySelector('.update-badge');
+  if (!container) return;
+
+  // 로딩 중 표시
+  container.innerHTML = `<div style="padding:20px; color:#aaa; font-size:0.9rem;">🔄 Loading latest news...</div>`;
+
+  try {
+    const response = await fetch(API_URL);
+    const data = await response.json();
+
+    if (data.status === 'ok') {
+      container.innerHTML = ""; // 초기화
+      
+      // 최신 5개 기사만 가져오기
+      const articles = data.items.slice(0, 5);
+
+      articles.forEach(item => {
+        // 이미지 태그가 없는 경우를 대비한 기본 썸네일 처리 (구글 RSS는 썸네일이 잘 안 옴)
+        // 제목 정리 (매체명 제거 등)
+        const cleanTitle = item.title.split(" - ")[0];
+        const sourceName = item.title.split(" - ")[1] || "News";
+        
+        // 날짜 포맷팅
+        const date = new Date(item.pubDate);
+        const timeAgo = getTimeAgo(date);
+
+        const card = document.createElement('div');
+        card.className = 'news-card';
+        card.onclick = () => window.open(item.link, '_blank');
+
+        card.innerHTML = `
+          <div>
+            <span class="news-tag">#Korea_Trending</span>
+            <div class="news-title">${cleanTitle}</div>
+            <div class="news-summary" style="font-size:0.8rem; color:#94a3b8;">
+              ${item.description ? item.description.replace(/<[^>]*>?/gm, '').substring(0, 80) + "..." : "Click to read the full story about this topic."}
+            </div>
+          </div>
+          <div class="news-footer">
+            <span>${sourceName}</span> • <span>${timeAgo}</span>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+
+      // 배지 시간 갱신
+      if(badge) badge.textContent = "Just Updated";
+
+    } else {
+      throw new Error("API Error");
+    }
+  } catch (error) {
+    console.error("News fetch failed:", error);
+    // 실패 시 기본(백업) 데이터 표시
+    loadBackupNews();
+  }
+}
+
+// 백업 데이터 (API 실패 시 보여줄 고정 뉴스)
+function loadBackupNews() {
+  const container = document.getElementById('news-card-list');
+  const newsData = [
+    { tag: "Backup", title: "Han Kang wins Nobel Prize", summary: "Acclaimed author Han Kang makes history for Korean literature.", source: "CNN", url: "https://edition.cnn.com/" },
+    { tag: "Backup", title: "K-Food goes viral in US", summary: "Frozen kimbap sells out nationwide in America.", source: "NBC", url: "https://www.nbcnews.com/" }
+  ];
+  
+  container.innerHTML = "";
+  newsData.forEach(news => {
+    const card = document.createElement('div');
+    card.className = 'news-card';
+    card.onclick = () => window.open(news.url, '_blank');
+    card.innerHTML = `
+      <div><span class="news-tag">#${news.tag}</span><div class="news-title">${news.title}</div><div class="news-summary">${news.summary}</div></div>
+      <div class="news-footer">Source: ${news.source}</div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+// 시간 계산 함수 (예: 2 hours ago)
+function getTimeAgo(date) {
+  const seconds = Math.floor((new Date() - date) / 1000);
+  let interval = seconds / 3600;
+  if (interval > 1) return Math.floor(interval) + " hours ago";
+  interval = seconds / 60;
+  if (interval > 1) return Math.floor(interval) + " mins ago";
+  return "Just now";
+}
+
+// 뉴스 자동 갱신 시스템
+function initNewsUpdater() {
+  fetchRealNews(); // 최초 실행
+
+  // 1시간(3600초 * 1000밀리초)마다 갱신
+  setInterval(() => {
+    fetchRealNews();
+    console.log("📰 News updated automatically.");
+  }, 3600000);
+}
+
+// 초기화 실행 부분에 추가
 loadMemorizedData();
 loadVoices();
+initNewsUpdater(); // [신규] 뉴스 로더 실행
+
 if (!history.state) history.replaceState({ page: 'home' }, "", "#home");
+
 if (typeof patternData !== "undefined") updatePatternProgress();
 if (typeof wordData !== "undefined") updateWordProgress();
 if (typeof idiomData !== "undefined") updateIdiomProgress();
 goTo("home");
-
