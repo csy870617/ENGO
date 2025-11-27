@@ -5,13 +5,13 @@
 
 :root {
   /* Color Palette */
-  --bg-dark: #0f172a;       /* 깊은 남색 배경 */
-  --bg-card: rgba(30, 41, 59, 0.7); /* 반투명 카드 배경 */
-  --primary: #8b5cf6;       /* 네온 바이올렛 */
+  --bg-dark: #0f172a;       
+  --bg-card: rgba(30, 41, 59, 0.7); 
+  --primary: #8b5cf6;       
   --primary-glow: rgba(139, 92, 246, 0.5);
-  --accent: #38bdf8;        /* 네온 스카이블루 */
-  --secondary: #64748b;     /* 회색 텍스트 */
-  --text-main: #f8fafc;     /* 흰색 텍스트 */
+  --accent: #38bdf8;        
+  --secondary: #64748b;     
+  --text-main: #f8fafc;     
   --text-sub: #94a3b8;
   --danger: #ef4444;
   --success: #10b981;
@@ -26,6 +26,17 @@
   --nav-height: 60px;
 }
 
+/* style.css 상단 부분 수정 */
+
+/* [수정됨] 글자 크기 시스템 (body -> html로 변경해야 rem 단위가 먹힙니다) */
+html { font-size: 16px; transition: font-size 0.2s ease-in-out; }
+
+/* html 태그에 클래스가 붙으면 기준 크기를 바꿉니다 */
+html.font-small { font-size: 14px; }   /* 작게 */
+html.font-medium { font-size: 16px; }  /* 기본 */
+html.font-large { font-size: 20px; }   /* 크게 (확대 효과) */
+
+/* 아래는 기존 유지 */
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; outline: none; }
 
 body {
@@ -34,7 +45,7 @@ body {
   color: var(--text-main);
   min-height: 100vh;
   overflow-x: hidden;
-  padding-top: var(--nav-height); /* 헤더 공간 */
+  padding-top: var(--nav-height); 
 }
 
 /* Background Glow Effect */
@@ -46,9 +57,7 @@ body {
 }
 @keyframes float { 0%, 100% { transform: translate(0,0); } 50% { transform: translate(20px, 20px); } }
 
-/* =========================
-   Header (Glass Bar)
-   ========================= */
+/* Header */
 header {
   position: fixed; top: 0; left: 0; width: 100%; height: var(--nav-height);
   background: rgba(15, 23, 42, 0.8);
@@ -59,21 +68,10 @@ header {
 }
 
 .logo {
-  font-size: 1.4rem; 
-  font-weight: 900; 
-  letter-spacing: -0.5px;
-  
-  /* 그라데이션 설정 */
+  font-size: 1.4rem; font-weight: 900; letter-spacing: -0.5px;
   background: linear-gradient(to right, var(--accent), var(--primary));
-  
-  /* 텍스트에 배경 입히기 (순서 중요) */
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  
-  /* ★ 중요: 텍스트 크기만큼만 배경 잡기 */
-  display: inline-block; 
-  margin: 0; /* 레이아웃 꺠짐 방지 */
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  display: inline-block; margin: 0;
 }
 
 .header-btns .icon-btn {
@@ -82,116 +80,69 @@ header {
 }
 .header-btns .icon-btn:hover { background: rgba(255,255,255,0.1); }
 
-/* =========================
-   Main Layout
-   ========================= */
+/* Main Layout */
 main {
   max-width: 600px; margin: 0 auto; padding: 20px;
   min-height: calc(100vh - var(--nav-height));
 }
-
 .hidden { display: none !important; }
 
-/* Hero Section */
-.hero-card {
-  text-align: center; 
-  margin-bottom: 30px; 
-  padding: 20px 0;
-}
-
+/* Hero */
+.hero-card { text-align: center; margin-bottom: 30px; padding: 20px 0; }
 .hero-card h1 {
-  font-size: 2rem; 
-  font-weight: 800; 
-  margin-bottom: 8px;
-  
-  /* 그라데이션 설정 */
+  font-size: 2rem; font-weight: 800; margin-bottom: 8px;
   background: linear-gradient(135deg, #fff 0%, #cbd5e1 100%);
-  
-  /* 텍스트에 배경 입히기 */
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  
-  /* ★ 중요: 텍스트 크기만큼만 배경 잡기 */
-  display: inline-block;
+  -webkit-background-clip: text; background-clip: text; color: transparent; display: inline-block;
 }
+.hero-card p { color: var(--text-sub); font-size: 1rem; }
 
-.hero-card p { 
-  color: var(--text-sub); 
-  font-size: 1rem; 
-}
-/* Home Grid (Bento Style) */
-.home-grid {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
-}
-
+/* Home Grid */
+.home-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .home-tile {
-  background: var(--bg-card);
-  border: var(--glass-border);
-  border-radius: var(--radius);
-  padding: 20px; cursor: pointer;
+  background: var(--bg-card); border: var(--glass-border);
+  border-radius: var(--radius); padding: 20px; cursor: pointer;
   transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-  position: relative; overflow: hidden;
-  display: flex; flex-direction: column; gap: 12px;
+  position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 12px;
 }
 .home-tile:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 10px 20px rgba(0,0,0,0.4);
-  background: rgba(255,255,255,0.08);
-  border-color: rgba(255,255,255,0.3);
+  transform: translateY(-4px); box-shadow: 0 10px 20px rgba(0,0,0,0.4);
+  background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.3);
 }
 .home-tile .tile-icon { font-size: 2rem; }
 .home-tile .label { font-weight: 700; font-size: 1.1rem; display: block; color: #fff; }
 .home-tile .desc { font-size: 0.8rem; color: var(--text-sub); }
 
-/* Tile Accents (Gradients) */
 .tile-pattern::before { content:''; position:absolute; top:0; left:0; width:4px; height:100%; background: #3b82f6; }
 .tile-word::before { content:''; position:absolute; top:0; left:0; width:4px; height:100%; background: #f59e0b; }
 .tile-idiom::before { content:''; position:absolute; top:0; left:0; width:4px; height:100%; background: #10b981; }
 .tile-conv::before { content:''; position:absolute; top:0; left:0; width:4px; height:100%; background: #ec4899; }
 .tile-speaking::before { content:''; position:absolute; top:0; left:0; width:4px; height:100%; background: #8b5cf6; }
 .tile-puzzle::before { content:''; position:absolute; top:0; left:0; width:4px; height:100%; background: #ef4444; }
-.tile-quiz::before { content:''; position:absolute; top:0; left:0; width:4px; height:100%; background: #06b6d4; }
 
-/* =========================
-   Navigation Header (Sub-pages)
-   ========================= */
-.nav-header {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 20px;
-}
-.back-btn {
-  color: var(--accent); cursor: pointer; font-weight: 600; font-size: 0.95rem;
-  padding: 8px 12px 8px 0; transition: 0.2s;
-}
+/* Navigation */
+.nav-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.back-btn { color: var(--accent); cursor: pointer; font-weight: 600; font-size: 0.95rem; padding: 8px 12px 8px 0; transition: 0.2s; }
 .back-btn:hover { color: #fff; }
 .nav-header h2 { font-size: 1.4rem; color: #fff; }
 
-/* =========================
-   Lists & Cards
-   ========================= */
+/* Cards & Lists */
 .card {
   background: var(--bg-card); border: var(--glass-border);
   border-radius: var(--radius); padding: 24px; margin-bottom: 20px;
   box-shadow: var(--shadow);
 }
-
-.list-view {
-  display: flex; flex-direction: column; gap: 12px;
-}
-
+.list-view { display: flex; flex-direction: column; gap: 12px; }
 .list-item {
   background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05);
   padding: 16px 20px; border-radius: 16px; cursor: pointer;
-  display: flex; justify-content: space-between; align-items: center;
-  transition: 0.2s;
+  display: flex; justify-content: space-between; align-items: center; transition: 0.2s;
 }
 .list-item:hover { background: rgba(255,255,255,0.08); border-color: var(--primary); }
 .list-item-title { font-weight: 600; color: #fff; margin-bottom: 4px; font-size: 1rem; }
 .list-item-sub { color: var(--text-sub); font-size: 0.85rem; }
 .list-item.memorized { opacity: 0.5; text-decoration: line-through; }
 
-/* Inputs & Filters */
+/* Inputs */
 .search-input {
   width: 100%; padding: 14px; border-radius: 12px;
   background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1);
@@ -211,9 +162,7 @@ main {
 .chip-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 .chip-btn.outline.active { background: transparent; border-color: var(--accent); color: var(--accent); }
 
-/* =========================
-   Detail View Styles
-   ========================= */
+/* Detail View */
 .detail-card {
   text-align: center; padding: 30px 20px; margin-bottom: 20px;
   background: linear-gradient(180deg, rgba(139, 92, 246, 0.1) 0%, rgba(15, 23, 42, 0) 100%);
@@ -226,18 +175,11 @@ main {
 .check-row label { color: var(--accent); cursor: pointer; font-weight: 600; font-size: 0.9rem; }
 .check-row input { margin-right: 8px; transform: scale(1.2); accent-color: var(--accent); }
 
-.content-area {
-  background: var(--bg-card); border-radius: var(--radius);
-  border: var(--glass-border); padding: 20px;
-}
-
-.control-bar {
-  display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
-}
+.content-area { background: var(--bg-card); border-radius: var(--radius); border: var(--glass-border); padding: 20px; }
+.control-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .control-bar.right { justify-content: flex-end; }
 .toggle-label { color: var(--text-sub); font-size: 0.9rem; cursor: pointer; }
 
-/* Sentence Rows */
 .sentence-row {
   padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
   display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
@@ -278,9 +220,7 @@ main {
 }
 .nav-buttons button:hover { border-color: #fff; color: #fff; }
 
-/* =========================
-   Game & Practice Modes
-   ========================= */
+/* Game & Practice */
 .game-card {
   background: var(--bg-card); border: var(--glass-border);
   border-radius: var(--radius); padding: 24px; text-align: center;
@@ -288,44 +228,12 @@ main {
 }
 .game-card h2 { margin-bottom: 10px; color: #fff; }
 
-/* Speaking Mode */
-.speech-bubble {
-  background: rgba(255,255,255,0.05); padding: 20px; border-radius: 16px;
-  margin-bottom: 20px; text-align: left; border: 1px solid rgba(255,255,255,0.1);
-}
-.speech-bubble .label { color: var(--accent); font-size: 0.8rem; font-weight: 700; margin-bottom: 6px; }
-.en-text { font-size: 1.2rem; font-weight: 600; color: #fff; margin-bottom: 4px; }
-.kr-text { font-size: 0.95rem; color: var(--text-sub); }
-
-.mic-area { margin: 30px 0; }
-.mic-btn {
-  width: 80px; height: 80px; border-radius: 50%;
-  background: linear-gradient(135deg, #ef4444, #f97316);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 2rem; margin: 0 auto 10px; cursor: pointer;
-  box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
-  transition: 0.3s;
-}
-.mic-btn.recording { animation: pulse 1.5s infinite; background: #fff; color: #ef4444; }
-@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255,255,255,0.4); } 70% { box-shadow: 0 0 0 20px rgba(255,255,255,0); } 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); } }
-
-.result-box {
-  background: rgba(16, 185, 129, 0.1); border: 1px solid var(--success);
-  padding: 12px; border-radius: 10px; color: #fff; font-size: 1rem; margin-bottom: 20px;
-}
-
-.answer-reveal { margin: 20px 0; text-align: left; }
-.answer-box { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; margin-top: 10px; }
-
-/* Puzzle Mode */
 .puzzle-slot {
   min-height: 60px; background: rgba(0,0,0,0.2); border-radius: 12px;
   border: 2px dashed rgba(255,255,255,0.2); margin: 20px 0;
   display: flex; flex-wrap: wrap; gap: 8px; padding: 10px;
 }
-.puzzle-pieces {
-  display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 20px;
-}
+.puzzle-pieces { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 20px; }
 .token {
   background: rgba(139, 92, 246, 0.2); border: 1px solid var(--primary);
   color: #ddd6fe; padding: 8px 14px; border-radius: 20px; font-size: 0.95rem;
@@ -333,22 +241,10 @@ main {
 }
 .token:hover { background: var(--primary); color: #fff; }
 
-/* Quiz Mode */
-.quiz-options { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
-.quiz-option-btn {
-  width: 100%; padding: 16px; background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1); color: #fff; text-align: left;
-  border-radius: 12px; cursor: pointer; transition: 0.2s; font-size: 1rem;
-}
-.quiz-option-btn:hover { background: rgba(255,255,255,0.1); }
-.quiz-option-btn.correct { background: rgba(16, 185, 129, 0.2); border-color: var(--success); color: var(--success); }
-.quiz-option-btn.wrong { background: rgba(239, 68, 68, 0.2); border-color: var(--danger); color: var(--danger); }
-
 .feedback-msg { font-weight: bold; min-height: 24px; margin: 10px 0; }
 .feedback.ok { color: var(--success); }
 .feedback.error { color: var(--danger); }
 
-/* Progress Bar */
 .progress-card { text-align: center; padding: 16px !important; }
 .progress-text { font-size: 0.85rem; color: var(--accent); margin-bottom: 6px; font-weight: 600; }
 .progress-track { background: rgba(255,255,255,0.1); height: 6px; border-radius: 3px; overflow: hidden; }
@@ -375,107 +271,31 @@ main {
 .modal-btns.vertical { flex-direction: column; }
 .btn-text { background: none; border: none; color: var(--text-sub); cursor: pointer; padding: 8px; }
 
-/* Chat List */
 .chat-list { display: flex; flex-direction: column; gap: 12px; }
 
-/* =========================
-   로딩 스피너 스타일
-   ========================= */
-@keyframes spin {
-  to { transform: rotate(360deg); }
+/* [신규] 설정 화면용 버튼 그룹 (Segmented Control) */
+.setting-group { margin-bottom: 20px; }
+.setting-label { display: block; color: var(--text-sub); margin-bottom: 8px; font-size: 0.9rem; }
+.btn-group {
+  display: flex; gap: 6px; background: rgba(0,0,0,0.3); 
+  padding: 4px; border-radius: 12px;
 }
-
-.spinner {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border: 2px solid rgba(15, 23, 42, 0.2); /* 진한 남색 배경용 연한 테두리 */
-  border-top-color: #0f172a; /* 돌아가는 부분 색상 */
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  vertical-align: middle;
-  margin-right: 6px;
-}
-
-/* =========================================
-   말하기 연습: 소리 재생 버튼 (최종)
-========================================= */
-
-#speaking-play-btn {
-  /* 1. 크기와 모양 강제 지정 */
-  width: 80px !important;
-  height: 80px !important;
-  border-radius: 50% !important;
-  padding: 0 !important;
-  
-  /* 2. 배경 (보라색 그라데이션) */
-  background: linear-gradient(135deg, #8b5cf6, #6366f1) !important;
-  
-  /* 3. 테두리와 그림자 */
-  border: 4px solid #ffffff !important;
-  box-shadow: 0 10px 20px rgba(124, 58, 237, 0.3) !important;
-  
-  /* 4. 내부 아이콘 정렬 */
-  display: inline-flex !important;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  
-  /* 5. 애니메이션 */
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-/* 마우스 올렸을 때 */
-#speaking-play-btn:hover {
-  transform: scale(1.05);
-  box-shadow: 0 12px 24px rgba(124, 58, 237, 0.45) !important;
-}
-
-/* 눌렀을 때 쏙 들어가는 효과 */
-#speaking-play-btn:active {
-  transform: scale(0.95);
-  box-shadow: 0 5px 10px rgba(124, 58, 237, 0.3) !important;
-}
-
-/* 아이콘 위치 미세 조정 */
-#speaking-play-btn svg {
-  margin-left: 2px; /* 시각적으로 중앙에 오도록 살짝 조정 */
-}
-
-/* style.css 맨 아래에 추가 */
-
-/* 쉐도잉 블라인드 모드 효과 */
-.blind-text {
-  filter: blur(8px);
-  user-select: none; /* 드래그 방지 */
-  transition: filter 0.3s ease;
-  cursor: pointer;
-}
-
-.blind-text:hover, .blind-text.revealed {
-  filter: blur(0);
-}
-
-.shadowing-controls-row {
-  display: flex;
-  justify-content: center;
-  gap: 15px;
-  margin-bottom: 20px;
-}
-
-.toggle-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: var(--text-sub);
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 0.85rem;
-  cursor: pointer;
+.btn-group button {
+  flex: 1; background: transparent; border: none; color: #94a3b8;
+  padding: 10px 0; border-radius: 8px; cursor: pointer; font-size: 0.9rem;
   transition: 0.2s;
 }
-
-.toggle-btn.active {
-  background: var(--primary);
-  color: #fff;
-  border-color: var(--primary);
+.btn-group button.active {
+  background: var(--primary); color: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
 }
+
+/* 쉐도잉 블라인드 효과 */
+.blind-text { filter: blur(8px); user-select: none; transition: filter 0.3s ease; cursor: pointer; }
+.blind-text:hover, .blind-text.revealed { filter: blur(0); }
+.shadowing-controls-row { display: flex; justify-content: center; gap: 15px; margin-bottom: 20px; }
+.toggle-btn {
+  background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--text-sub); padding: 6px 12px; border-radius: 20px;
+  font-size: 0.85rem; cursor: pointer; transition: 0.2s;
+}
+.toggle-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
