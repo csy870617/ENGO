@@ -5,13 +5,13 @@
 
 :root {
   /* Color Palette */
-  --bg-dark: #0f172a;       
-  --bg-card: rgba(30, 41, 59, 0.7); 
-  --primary: #8b5cf6;       
+  --bg-dark: #0f172a;       /* 깊은 남색 배경 */
+  --bg-card: rgba(30, 41, 59, 0.7); /* 반투명 카드 배경 */
+  --primary: #8b5cf6;       /* 네온 바이올렛 */
   --primary-glow: rgba(139, 92, 246, 0.5);
-  --accent: #38bdf8;        
-  --secondary: #64748b;     
-  --text-main: #f8fafc;     
+  --accent: #38bdf8;        /* 네온 스카이블루 */
+  --secondary: #64748b;     /* 회색 텍스트 */
+  --text-main: #f8fafc;     /* 흰색 텍스트 */
   --text-sub: #94a3b8;
   --danger: #ef4444;
   --success: #10b981;
@@ -26,36 +26,32 @@
   --nav-height: 60px;
 }
 
-/* style.css 상단 부분 수정 */
-
-/* [수정됨] 글자 크기 시스템 (body -> html로 변경해야 rem 단위가 먹힙니다) */
+/* [수정됨] 글자 크기 시스템 (html 기준) */
 html { font-size: 16px; transition: font-size 0.2s ease-in-out; }
+html.font-small { font-size: 14px; }
+html.font-medium { font-size: 16px; }
+html.font-large { font-size: 20px; }
 
-/* html 태그에 클래스가 붙으면 기준 크기를 바꿉니다 */
-html.font-small { font-size: 14px; }   /* 작게 */
-html.font-medium { font-size: 16px; }  /* 기본 */
-html.font-large { font-size: 20px; }   /* 크게 (확대 효과) */
-
-/* 아래는 기존 유지 */
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; outline: none; }
 
 body {
   font-family: 'Pretendard', sans-serif;
-  background-color: var(--bg-dark);
+  
+  /* [수정됨] 배경을 깔끔한 단색으로 고정 */
+  background-color: var(--bg-dark); 
+  /* 만약 아주 은은한 그라데이션을 원하시면 아래 주석을 해제하고 위를 지우세요 */
+  /* background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%); */
+
   color: var(--text-main);
   min-height: 100vh;
   overflow-x: hidden;
   padding-top: var(--nav-height); 
 }
 
-/* Background Glow Effect */
+/* [수정됨] 배경 빛 효과 제거 (투톤 현상 해결) */
 .bg-glow {
-  position: fixed; top: -20%; left: -20%; width: 70%; height: 70%;
-  background: radial-gradient(circle, var(--primary-glow), transparent 70%);
-  opacity: 0.3; pointer-events: none; z-index: -1;
-  animation: float 10s infinite ease-in-out;
+  display: none; 
 }
-@keyframes float { 0%, 100% { transform: translate(0,0); } 50% { transform: translate(20px, 20px); } }
 
 /* Header */
 header {
