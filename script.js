@@ -1201,13 +1201,13 @@ if (typeof Kakao !== 'undefined' && KAKAO_JS_KEY !== '7e17cb2ba4738f9e3cd710879d
 
 function shareApp() {
   // 1. 카카오톡 공유
-  if (typeof Kakao !== 'undefined' && Kakao.isInitialized()) {
+if (typeof Kakao !== 'undefined' && Kakao.isInitialized()) {
     try {
       Kakao.Share.sendDefault({
         objectType: 'feed',
         content: {
-          title: 'English & Go',
-          description: '오늘의 영어 정복을 시작해볼까요? 영어회화 공부 ENGO와 함께해요.',
+          title: 'English & Go - 오늘의 영어 정복을 시작해볼까요?',
+          description: '영어회화 공부 ENGO와 함께해요.',
           imageUrl: window.location.origin + '/icon.png', 
           link: {
             mobileWebUrl: window.location.href,
@@ -1257,3 +1257,4 @@ if (typeof patternData !== "undefined") updatePatternProgress();
 if (typeof wordData !== "undefined") updateWordProgress();
 if (typeof idiomData !== "undefined") updateIdiomProgress();
 goTo("home");
+
