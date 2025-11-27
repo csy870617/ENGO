@@ -396,3 +396,48 @@ main {
   vertical-align: middle;
   margin-right: 6px;
 }
+
+/* =========================================
+   말하기 연습: 소리 재생 버튼 (최종)
+========================================= */
+
+#speaking-play-btn {
+  /* 1. 크기와 모양 강제 지정 */
+  width: 80px !important;
+  height: 80px !important;
+  border-radius: 50% !important;
+  padding: 0 !important;
+  
+  /* 2. 배경 (보라색 그라데이션) */
+  background: linear-gradient(135deg, #8b5cf6, #6366f1) !important;
+  
+  /* 3. 테두리와 그림자 */
+  border: 4px solid #ffffff !important;
+  box-shadow: 0 10px 20px rgba(124, 58, 237, 0.3) !important;
+  
+  /* 4. 내부 아이콘 정렬 */
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  
+  /* 5. 애니메이션 */
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* 마우스 올렸을 때 */
+#speaking-play-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 12px 24px rgba(124, 58, 237, 0.45) !important;
+}
+
+/* 눌렀을 때 쏙 들어가는 효과 */
+#speaking-play-btn:active {
+  transform: scale(0.95);
+  box-shadow: 0 5px 10px rgba(124, 58, 237, 0.3) !important;
+}
+
+/* 아이콘 위치 미세 조정 */
+#speaking-play-btn svg {
+  margin-left: 2px; /* 시각적으로 중앙에 오도록 살짝 조정 */
+}
