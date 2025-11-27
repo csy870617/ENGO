@@ -1200,14 +1200,15 @@ if (typeof Kakao !== 'undefined' && KAKAO_JS_KEY !== '7e17cb2ba4738f9e3cd710879d
 }
 
 function shareApp() {
+  // 1. 카카오톡 공유
   if (typeof Kakao !== 'undefined' && Kakao.isInitialized()) {
     try {
       Kakao.Share.sendDefault({
         objectType: 'feed',
         content: {
-          title: 'ENGO - 영어회화의 시작과 끝',
-          description: '패턴, 단어, 숙어, 쉐도잉까지! 영어회화의 모든 것!',
-          imageUrl: window.location.origin + '/icon.png',
+          title: 'English & Go',
+          description: '오늘의 영어 정복을 시작해볼까요? 영어회화 공부 ENGO와 함께해요.',
+          imageUrl: window.location.origin + '/icon.png', 
           link: {
             mobileWebUrl: window.location.href,
             webUrl: window.location.href,
@@ -1223,19 +1224,21 @@ function shareApp() {
           },
         ],
       });
-      return;
+      return; 
     } catch(e) {
       console.log("Kakao share failed, trying native share...");
     }
   }
 
+  // 2. 기본 공유
   if (navigator.share) {
     navigator.share({
-      title: 'ENGO - 영어회화의 시작과 끝',
-      text: '함께 영어 공부해요!',
+      title: 'English & Go',
+      text: '오늘의 영어 정복을 시작해볼까요? 영어회화 공부 ENGO와 함께해요.',
       url: window.location.href,
     }).catch(console.log);
   } 
+  // 3. 클립보드 복사
   else {
     const dummy = document.createElement('input');
     document.body.appendChild(dummy);
