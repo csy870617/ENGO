@@ -1197,7 +1197,7 @@ function shareApp() {
         objectType: 'feed',
         content: {
           title: 'English & Go',
-          description: '영어회화 공부 ENGO와 함께해요.',
+          description: '영어회화 공부 ENGO와 함께',
           imageUrl: window.location.origin + '/icon.png', 
           link: {
             mobileWebUrl: window.location.href,
@@ -1224,7 +1224,7 @@ function shareApp() {
   if (navigator.share) {
     navigator.share({
       title: 'English & Go',
-      text: '영어회화 공부 ENGO와 함께해요.',
+      text: '영어회화 공부 ENGO와 함께',
       url: window.location.href,
     }).catch(console.log);
   } 
@@ -1385,5 +1385,6 @@ if (typeof patternData !== "undefined") updatePatternProgress();
 if (typeof wordData !== "undefined") updateWordProgress();
 if (typeof idiomData !== "undefined") updateIdiomProgress();
 goTo("home");
+
 
 
