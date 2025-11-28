@@ -1286,7 +1286,7 @@ function shareApp() {
 }
 
 // ==========================================
-// 16. [수정됨] 실시간 영어 뉴스 로더 (수동 새로고침)
+// 16. [수정됨] 실시간 영어 뉴스 로더 (랜덤 셔플 적용)
 // ==========================================
 const NEWS_TOPICS = [
   "https://news.google.com/rss/search?q=South+Korea+(k-pop+OR+k-drama+OR+movie)+(popular+OR+success)&hl=en-US&gl=US&ceid=US:en",
@@ -1296,9 +1296,7 @@ const NEWS_TOPICS = [
 
 let currentTopicIndex = 0; 
 
-// [신규] 사용자가 버튼을 누르면 호출되는 함수
 function refreshNews() {
-  // 버튼에 회전 애니메이션 효과 등을 주고 싶다면 여기서 처리 가능
   fetchRealNews();
 }
 
@@ -1306,9 +1304,8 @@ async function fetchRealNews() {
   const container = document.getElementById('news-card-list');
   if (!container) return;
 
-  // 로딩 표시
   container.innerHTML = `<div style="padding:30px; text-align:center; color:#94a3b8; font-size:0.9rem; width:100%;">
-    🔄 Fetching new stories...<br><span style="font-size:0.8rem; opacity:0.7">Topic ${currentTopicIndex + 1} Loading</span>
+    🔄 Mixing fresh stories...<br><span style="font-size:0.8rem; opacity:0.7">Topic ${currentTopicIndex + 1} Loading</span>
   </div>`;
 
   const currentRssUrl = NEWS_TOPICS[currentTopicIndex];
@@ -1321,9 +1318,15 @@ async function fetchRealNews() {
     if (data.status === 'ok') {
       container.innerHTML = ""; // 초기화
       
-      const articles = data.items.slice(0, 3);
+      // [핵심 변경] 최신 기사 15개를 가져와서 -> 무작위로 섞은 뒤 -> 3개만 뽑음
+      // 이렇게 하면 버튼 누를 때마다 계속 다른 기사 조합이 나옴
+      let allArticles = data.items.slice(0, 15); 
+      
+      // 랜덤 섞기 (Fisher-Yates Shuffle 간단 버전)
+      const shuffled = allArticles.sort(() => 0.5 - Math.random());
+      const selectedArticles = shuffled.slice(0, 3);
 
-      articles.forEach(item => {
+      selectedArticles.forEach(item => {
         const cleanTitle = item.title.split(" - ")[0];
         const sourceName = item.title.split(" - ")[1] || "News";
         const date = new Date(item.pubDate);
@@ -1333,7 +1336,7 @@ async function fetchRealNews() {
         card.className = 'news-card';
         card.onclick = () => window.open(item.link, '_blank');
 
-        // 주제별 태그 이름 설정
+        // 주제별 태그 이름
         let topicTag = "#Trending";
         if (currentTopicIndex === 0) topicTag = "#K-Culture";
         else if (currentTopicIndex === 1) topicTag = "#Tech&Biz";
@@ -1354,7 +1357,7 @@ async function fetchRealNews() {
         container.appendChild(card);
       });
 
-      // 다음 클릭 시 다른 주제가 나오도록 인덱스 변경 (0 -> 1 -> 2 -> 0)
+      // 다음 주제로 변경
       currentTopicIndex = (currentTopicIndex + 1) % NEWS_TOPICS.length;
 
     } else {
@@ -1366,6 +1369,7 @@ async function fetchRealNews() {
   }
 }
 
+// ... (loadBackupNews, getTimeAgo 등 아래 코드는 그대로 유지) ...
 function loadBackupNews() {
   const container = document.getElementById('news-card-list');
   const newsData = [
@@ -1419,7 +1423,7 @@ function getTimeAgo(date) {
   return "Just now";
 }
 
-// [수정됨] 자동 갱신(setInterval) 제거, 최초 1회만 실행
+// 최초 1회 실행 (자동 갱신 X)
 function initNewsUpdater() {
   fetchRealNews(); 
 }
@@ -1433,4 +1437,5 @@ if (typeof patternData !== "undefined") updatePatternProgress();
 if (typeof wordData !== "undefined") updateWordProgress();
 if (typeof idiomData !== "undefined") updateIdiomProgress();
 goTo("home");
+
 
