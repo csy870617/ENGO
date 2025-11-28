@@ -55,44 +55,38 @@ let shadowingLineIndex = 0;
 let isBackAction = false; 
 
 // ==========================================
-// 2. 네비게이션 (히스토리 API 최적화 - 초기화 문제 해결)
+// 2. 네비게이션 (히스토리 API 최적화)
 // ==========================================
 
 // 뒤로가기 버튼 감지
 window.onpopstate = function(event) {
-  // 모달 닫기 우선 처리
   const openModals = document.querySelectorAll('.modal:not(.hidden)');
   if (openModals.length > 0) {
     openModals.forEach(modal => modal.classList.add('hidden'));
-    return; // 페이지 이동 로직 실행 안 함
+    return;
   }
 
-  // 히스토리 state가 없으면 URL 해시에서 페이지 추론 (없으면 home)
-  // [수정] event.state가 null일 경우(앱 최초 실행 상태)를 대비함
-  const page = (event.state && event.state.page) ? event.state.page : (location.hash.replace('#', '') || 'home');
+  // 히스토리가 없으면(앱 종료 직전) null일 수 있음 -> home으로 처리하되 기록은 안 남김
+  const page = (event.state && event.state.page) ? event.state.page : 'home';
   
   isBackAction = true;
-  renderPageOnly(page); // 기록 추가 없이 화면만 변경
+  renderPageOnly(page); // [중요] 화면만 갱신하고 뉴스는 건드리지 않음
   isBackAction = false;
 };
 
-// 버튼 클릭 시 페이지 이동 (기록 추가)
+// 버튼 클릭 시 이동 (기록 추가)
 function goTo(page) {
   if ("speechSynthesis" in window) {
     window.speechSynthesis.cancel();
   }
 
-  // 현재 페이지와 같으면 이동 안 함 (중복 기록 방지)
-  // state가 null인 경우(첫 진입)도 고려하여 해시값 비교
-  const currentPage = history.state ? history.state.page : (location.hash.replace('#', '') || 'home');
-  if (currentPage === page) return;
+  if (history.state && history.state.page === page) return;
 
-  // 새 기록 추가
   history.pushState({ page: page }, "", "#" + page);
   renderPageOnly(page);
 }
 
-// 순수하게 화면만 변경하는 함수 (히스토리 조작 X)
+// 순수 화면 변경 함수 (뉴스 로딩 로직 제거됨)
 function renderPageOnly(page) {
   pages.forEach((p) => {
     const el = document.getElementById("page-" + p);
@@ -108,12 +102,6 @@ function renderPageOnly(page) {
   if (page === "conversations") renderConversationList();
   if (page === "shadowing-list") renderShadowingList();
   if (page === "puzzle") initPuzzle();
-
-  // [수정] 홈 화면이고 뉴스가 '아직 한 번도 안 불려졌을 때만' 로드
-  // 뒤로 가기로 홈에 왔을 때는 뉴스를 갱신하지 않음 -> 뉴스 고정됨 -> 깜빡임/딜레이 없음
-  if (page === "home" && !newsLoaded) {
-    fetchRealNews();
-  }
 }
 
 // ==========================================
@@ -123,27 +111,22 @@ function loadMemorizedData() {
   try {
     const pRaw = localStorage.getItem("patternMemorizedIds");
     if (pRaw) memorizedPatterns = new Set(JSON.parse(pRaw));
-
     const wRaw = localStorage.getItem("wordMemorizedIds");
     if (wRaw) memorizedWords = new Set(JSON.parse(wRaw));
-
     const iRaw = localStorage.getItem("idiomMemorizedIds");
     if (iRaw) memorizedIdioms = new Set(JSON.parse(iRaw));
 
-    const pStudyRaw = localStorage.getItem("patternStudyingOnly");
-    if (pStudyRaw !== null) patternStudyingOnly = (pStudyRaw === 'true');
+    const pStudy = localStorage.getItem("patternStudyingOnly");
+    if(pStudy !== null) patternStudyingOnly = (pStudy === 'true');
+    const wStudy = localStorage.getItem("wordStudyingOnly");
+    if(wStudy !== null) wordStudyingOnly = (wStudy === 'true');
+    const iStudy = localStorage.getItem("idiomStudyingOnly");
+    if(iStudy !== null) idiomStudyingOnly = (iStudy === 'true');
 
-    const wStudyRaw = localStorage.getItem("wordStudyingOnly");
-    if (wStudyRaw !== null) wordStudyingOnly = (wStudyRaw === 'true');
-
-    const iStudyRaw = localStorage.getItem("idiomStudyingOnly");
-    if (iStudyRaw !== null) idiomStudyingOnly = (iStudyRaw === 'true');
-
-    const wLevelRaw = localStorage.getItem("selectedWordLevel");
-    if (wLevelRaw !== null) selectedWordLevel = parseInt(wLevelRaw);
-
-    const iLevelRaw = localStorage.getItem("selectedIdiomLevel");
-    if (iLevelRaw !== null) selectedIdiomLevel = parseInt(iLevelRaw);
+    const wLevel = localStorage.getItem("selectedWordLevel");
+    if(wLevel !== null) selectedWordLevel = parseInt(wLevel);
+    const iLevel = localStorage.getItem("selectedIdiomLevel");
+    if(iLevel !== null) selectedIdiomLevel = parseInt(iLevel);
 
   } catch (e) { console.warn(e); }
 }
@@ -1173,7 +1156,6 @@ async function downloadData() {
     
     updatePatternProgress(); updateWordProgress(); updateIdiomProgress();
     
-    // 현재 페이지 갱신
     const currPage = history.state ? history.state.page : 'home';
     if (currPage === 'patterns') renderPatternList();
     if (currPage === 'words') renderWordList();
@@ -1326,7 +1308,6 @@ const NEWS_TOPICS = [
 ];
 
 let currentTopicIndex = 0; 
-let newsLoaded = false; // [중요] 뉴스 로드 여부 확인 플래그
 
 function refreshNews() {
   fetchRealNews();
@@ -1350,8 +1331,6 @@ async function fetchRealNews() {
     if (data.status === 'ok') {
       container.innerHTML = ""; 
       
-      newsLoaded = true; // [핵심] 로드 성공 시 플래그 true
-
       let allArticles = data.items.slice(0, 15); 
       const shuffled = allArticles.sort(() => 0.5 - Math.random());
       const selectedArticles = shuffled.slice(0, 3);
@@ -1450,10 +1429,26 @@ function getTimeAgo(date) {
   return "Just now";
 }
 
-// [핵심] 앱 초기화: history를 건드리지 않고 현재 URL에 맞춰 화면만 그림
-loadMemorizedData();
-loadVoices();
+// [핵심] 앱 초기화 함수
+function initApp() {
+  // 1. 데이터 로드
+  loadMemorizedData();
+  loadVoices();
 
-// 현재 해시에 따라 초기 화면 렌더링 (history 조작 X -> 1스택 유지)
-const initialPage = location.hash.replace('#', '') || 'home';
-renderPageOnly(initialPage);
+  // 2. 뉴스 로드 (단 1회)
+  // 이전 로직과 달리 여기서는 한 번만 부름. 뒤로 가기시 재호출 안함.
+  fetchRealNews();
+
+  // 3. 초기 화면 설정 (무조건 1개 스택으로 고정)
+  // 'replace' 모드로 강제하여 이전의 모든 기록을 현재 'home'으로 덮어씌움
+  const initialPage = 'home'; // 무조건 홈부터 시작
+  
+  // 화면 그리기 (히스토리 조작 X)
+  switchPage(initialPage);
+  
+  // 현재 상태를 'home'으로 못박음 (Replace)
+  history.replaceState({ page: initialPage }, "", "#" + initialPage);
+}
+
+// 앱 시작
+initApp();
