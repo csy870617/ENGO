@@ -55,7 +55,7 @@ let shadowingLineIndex = 0;
 let isBackAction = false; 
 
 // ==========================================
-// 2. 네비게이션 (히스토리 API 적용)
+// 2. 네비게이션 (히스토리 API 적용 - 뒤로가기 최적화)
 // ==========================================
 window.onpopstate = function(event) {
   const openModals = document.querySelectorAll('.modal:not(.hidden)');
@@ -63,20 +63,31 @@ window.onpopstate = function(event) {
     openModals.forEach(modal => modal.classList.add('hidden'));
   }
 
+  // 히스토리 상태가 없으면 홈으로 간주
   const page = (event.state && event.state.page) ? event.state.page : 'home';
+  
   isBackAction = true;
   goTo(page);
   isBackAction = false;
 };
 
-function goTo(page) {
+// [수정됨] isReplace 옵션 추가: 초기 로딩 시 히스토리를 쌓지 않기 위함
+function goTo(page, isReplace = false) {
   if ("speechSynthesis" in window) {
     window.speechSynthesis.cancel();
   }
 
+  // 뒤로가기 버튼으로 온 게 아닐 때만 히스토리 처리
   if (!isBackAction) {
-    if (!history.state || history.state.page !== page) {
-      history.pushState({ page: page }, "", "#" + page);
+    // 1. 강제 교체 모드이거나 (초기화용)
+    // 2. 현재 페이지와 다를 경우에만 히스토리 조작
+    if (isReplace) {
+      history.replaceState({ page: page }, "", "#" + page);
+    } else {
+      // 현재 페이지와 동일하면 중복해서 쌓지 않음
+      if (!history.state || history.state.page !== page) {
+        history.pushState({ page: page }, "", "#" + page);
+      }
     }
   }
 
@@ -100,7 +111,6 @@ function goTo(page) {
 // ==========================================
 function loadMemorizedData() {
   try {
-    // 암기 데이터 로드
     const pRaw = localStorage.getItem("patternMemorizedIds");
     if (pRaw) memorizedPatterns = new Set(JSON.parse(pRaw));
 
@@ -110,24 +120,22 @@ function loadMemorizedData() {
     const iRaw = localStorage.getItem("idiomMemorizedIds");
     if (iRaw) memorizedIdioms = new Set(JSON.parse(iRaw));
 
-    // 필터 상태 로드
-    const pStudy = localStorage.getItem("patternStudyingOnly");
-    if(pStudy !== null) patternStudyingOnly = (pStudy === 'true');
+    const pStudyRaw = localStorage.getItem("patternStudyingOnly");
+    if (pStudyRaw !== null) patternStudyingOnly = (pStudyRaw === 'true');
 
-    const wStudy = localStorage.getItem("wordStudyingOnly");
-    if(wStudy !== null) wordStudyingOnly = (wStudy === 'true');
+    const wStudyRaw = localStorage.getItem("wordStudyingOnly");
+    if (wStudyRaw !== null) wordStudyingOnly = (wStudyRaw === 'true');
 
-    const iStudy = localStorage.getItem("idiomStudyingOnly");
-    if(iStudy !== null) idiomStudyingOnly = (iStudy === 'true');
+    const iStudyRaw = localStorage.getItem("idiomStudyingOnly");
+    if (iStudyRaw !== null) idiomStudyingOnly = (iStudyRaw === 'true');
 
-    // 레벨 상태 로드
-    const wLevel = localStorage.getItem("selectedWordLevel");
-    if(wLevel !== null) selectedWordLevel = parseInt(wLevel);
+    const wLevelRaw = localStorage.getItem("selectedWordLevel");
+    if (wLevelRaw !== null) selectedWordLevel = parseInt(wLevelRaw);
 
-    const iLevel = localStorage.getItem("selectedIdiomLevel");
-    if(iLevel !== null) selectedIdiomLevel = parseInt(iLevel);
+    const iLevelRaw = localStorage.getItem("selectedIdiomLevel");
+    if (iLevelRaw !== null) selectedIdiomLevel = parseInt(iLevelRaw);
 
-  } catch (e) { console.warn("Load failed", e); }
+  } catch (e) { console.warn(e); }
 }
 
 function saveData(type) {
@@ -997,7 +1005,7 @@ function saveSettings() {
 }
 
 // ---------------------------------------------------------
-// 학습내용 저장/불러오기 (Firebase) - [중요: 레벨 및 필터 동기화 추가됨]
+// 학습내용 저장/불러오기 (Firebase)
 // ---------------------------------------------------------
 const firebaseConfig = {
   apiKey: "AIzaSyCdr88Bomc9SQzZBj03iih3epxivhPL63I",
@@ -1070,7 +1078,6 @@ async function uploadData() {
       if(!confirm(`'${id}' 계정을 새로 만들고 저장하시겠습니까?`)) return;
     }
 
-    // [중요] 레벨 및 필터 상태까지 함께 저장
     await ref.set({
       password: pw,
       updatedAt: new Date().toISOString(),
@@ -1082,7 +1089,7 @@ async function uploadData() {
         rate: userRate, 
         autoPlay: autoPlayEnabled,
         fontSize: userFontSize,
-        // 추가된 상태들
+        // [중요] 레벨/필터 상태 저장
         wordLevel: selectedWordLevel,
         idiomLevel: selectedIdiomLevel,
         filterPattern: patternStudyingOnly,
@@ -1131,7 +1138,7 @@ async function downloadData() {
         userFontSize = d.settings.fontSize;
         applyFontSizeToBody(userFontSize);
       }
-      // [중요] 레벨 및 필터 상태 복원
+      // [중요] 레벨/필터 상태 복원
       if(d.settings.wordLevel !== undefined) selectedWordLevel = d.settings.wordLevel;
       if(d.settings.idiomLevel !== undefined) selectedIdiomLevel = d.settings.idiomLevel;
       if(d.settings.filterPattern !== undefined) patternStudyingOnly = d.settings.filterPattern;
@@ -1158,7 +1165,7 @@ async function downloadData() {
     
     updatePatternProgress(); updateWordProgress(); updateIdiomProgress();
     
-    // 현재 페이지 갱신
+    // 현재 페이지 리렌더링
     const currPage = history.state ? history.state.page : 'home';
     if (currPage === 'patterns') renderPatternList();
     if (currPage === 'words') renderWordList();
@@ -1198,11 +1205,6 @@ document.body.addEventListener('click', function unlockTTS() {
   }
   document.body.removeEventListener('click', unlockTTS);
 }, { once: true });
-
-// ==========================================
-// 13. 페이지 종료 전 저장 유도 (제거됨 - 바로 종료)
-// ==========================================
-// 기존 beforeunload 이벤트 리스너 제거됨
 
 // ==========================================
 // 14. PWA 설치 배너 로직
@@ -1441,12 +1443,14 @@ function initNewsUpdater() {
   fetchRealNews(); 
 }
 
+// 1. 로컬 데이터 로드
 loadMemorizedData();
+// 2. TTS 초기화
 loadVoices();
+// 3. 뉴스 초기화
 initNewsUpdater(); 
 
-if (!history.state) history.replaceState({ page: 'home' }, "", "#home");
-if (typeof patternData !== "undefined") updatePatternProgress();
-if (typeof wordData !== "undefined") updateWordProgress();
-if (typeof idiomData !== "undefined") updateIdiomProgress();
-goTo("home");
+// 4. 초기 화면 렌더링 (중복 히스토리 방지)
+const initialPage = location.hash.replace('#', '') || 'home';
+// 처음 로드 시에는 replace 모드로 이동
+goTo(initialPage, true);
