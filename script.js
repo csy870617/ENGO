@@ -52,41 +52,44 @@ let patternStudyingOnly = false;
 let currentShadowingId = null;
 let shadowingLineIndex = 0;
 
-// ==========================================
-// 2. 네비게이션 (로직 분리: 화면전환 vs 기록저장)
-// ==========================================
+let isBackAction = false; 
 
-// [핵심] 브라우저 뒤로 가기 버튼을 눌렀을 때 실행됨
+// ==========================================
+// 2. 네비게이션 (히스토리 API 최적화)
+// ==========================================
 window.onpopstate = function(event) {
-  // 열린 모달 닫기
+  // 모달 닫기 우선 처리
   const openModals = document.querySelectorAll('.modal:not(.hidden)');
   if (openModals.length > 0) {
     openModals.forEach(modal => modal.classList.add('hidden'));
+    // 모달 닫을 때는 페이지 이동 로직 중단 (히스토리 꼬임 방지)
     return;
   }
 
-  // 히스토리 상태에 따라 화면만 변경 (기록 추가 X)
   const page = (event.state && event.state.page) ? event.state.page : 'home';
-  switchPage(page);
+  
+  isBackAction = true;
+  // 뒤로가기 시에는 화면만 변경 (기록 추가 X)
+  switchPage(page); 
+  isBackAction = false;
 };
 
-// [핵심] 사용자가 버튼을 눌러 이동할 때 (기록 추가 O)
+// [핵심] 기록을 남기며 이동 (버튼 클릭 시)
 function goTo(page) {
-  // 현재 페이지와 같으면 이동하지 않음 (중복 쌓임 방지)
-  if (history.state && history.state.page === page) return;
-
-  // 새 기록 추가
-  history.pushState({ page: page }, "", "#" + page);
-  switchPage(page);
-}
-
-// [핵심] 순수하게 화면만 바꿔주는 함수 (히스토리 조작 없음)
-function switchPage(page) {
   if ("speechSynthesis" in window) {
     window.speechSynthesis.cancel();
   }
 
-  // 모든 페이지 숨기고 해당 페이지만 보임
+  // 현재 페이지와 같으면 이동 안 함
+  if (history.state && history.state.page === page) return;
+
+  // 기록 추가
+  history.pushState({ page: page }, "", "#" + page);
+  switchPage(page);
+}
+
+// [핵심] 화면만 변경하는 함수 (기록 조작 없음)
+function switchPage(page) {
   pages.forEach((p) => {
     const el = document.getElementById("page-" + p);
     if (!el) return;
@@ -94,7 +97,7 @@ function switchPage(page) {
     else el.classList.add("hidden");
   });
 
-  // 페이지별 데이터 렌더링
+  // 페이지별 렌더링
   if (page === "patterns") renderPatternList();
   if (page === "words") renderWordList();
   if (page === "idioms") renderIdiomList();
@@ -102,7 +105,7 @@ function switchPage(page) {
   if (page === "shadowing-list") renderShadowingList();
   if (page === "puzzle") initPuzzle();
 
-  // 홈 화면이고 뉴스가 아직 없으면 로드
+  // 홈으로 돌아왔는데 뉴스가 비어있으면 로드
   if (page === "home" && !hasLoadedNews) {
     fetchRealNews();
   }
@@ -1206,109 +1209,7 @@ document.body.addEventListener('click', function unlockTTS() {
 }, { once: true });
 
 // ==========================================
-// 14. PWA 설치 배너 로직
-// ==========================================
-let deferredPrompt;
-const installBanner = document.getElementById('install-banner');
-
-window.addEventListener('beforeinstallprompt', (e) => {
-  console.log("✅ PWA 설치 이벤트 감지됨!"); 
-  e.preventDefault();
-  deferredPrompt = e;
-  
-  if (!localStorage.getItem('installBannerDismissed')) {
-    installBanner.classList.remove('hidden');
-  }
-});
-
-async function installPWA() {
-  if (!deferredPrompt) {
-    alert("브라우저 메뉴의 [홈 화면에 추가]나 [앱 설치]를 이용해주세요.");
-    return;
-  }
-  
-  deferredPrompt.prompt();
-  const { outcome } = await deferredPrompt.userChoice;
-  
-  deferredPrompt = null;
-  installBanner.classList.add('hidden');
-}
-
-function hideInstallBanner() {
-  installBanner.classList.add('hidden');
-  localStorage.setItem('installBannerDismissed', 'true');
-}
-
-window.addEventListener('appinstalled', () => {
-  installBanner.classList.add('hidden');
-  deferredPrompt = null;
-});
-
-// ==========================================
-// 15. 공유 기능
-// ==========================================
-const KAKAO_JS_KEY = 'YOUR_KAKAO_JS_KEY'; 
-
-if (typeof Kakao !== 'undefined' && KAKAO_JS_KEY !== 'YOUR_KAKAO_JS_KEY') {
-  try {
-    if (!Kakao.isInitialized()) {
-      Kakao.init(KAKAO_JS_KEY);
-    }
-  } catch(e) {
-    console.log("Kakao init failed", e);
-  }
-}
-
-function shareApp() {
-  if (typeof Kakao !== 'undefined' && Kakao.isInitialized()) {
-    try {
-      Kakao.Share.sendDefault({
-        objectType: 'feed',
-        content: {
-          title: 'English & Go',
-          description: '오늘의 영어 정복을 시작해볼까요? 영어회화 공부 ENGO와 함께해요.',
-          imageUrl: window.location.origin + '/icon.png',
-          link: {
-            mobileWebUrl: window.location.href,
-            webUrl: window.location.href,
-          },
-        },
-        buttons: [
-          {
-            title: '함께 공부하기',
-            link: {
-              mobileWebUrl: window.location.href,
-              webUrl: window.location.href,
-            },
-          },
-        ],
-      });
-      return;
-    } catch(e) {
-      console.log("Kakao share failed, trying native share...");
-    }
-  }
-
-  if (navigator.share) {
-    navigator.share({
-      title: 'English & Go',
-      text: '오늘의 영어 정복을 시작해볼까요? 영어회화 공부 ENGO와 함께해요.',
-      url: window.location.href,
-    }).catch(console.log);
-  } 
-  else {
-    const dummy = document.createElement('input');
-    document.body.appendChild(dummy);
-    dummy.value = window.location.href;
-    dummy.select();
-    document.execCommand('copy');
-    document.body.removeChild(dummy);
-    alert("링크가 복사되었습니다! 친구에게 붙여넣기 해보세요.");
-  }
-}
-
-// ==========================================
-// 16. 실시간 영어 뉴스 로더 (수동 새로고침)
+// 16. 실시간 영어 뉴스 로더
 // ==========================================
 const NEWS_TOPICS = [
   "https://news.google.com/rss/search?q=South+Korea+(k-pop+OR+k-drama+OR+movie)+(popular+OR+success)&hl=en-US&gl=US&ceid=US:en",
@@ -1317,7 +1218,7 @@ const NEWS_TOPICS = [
 ];
 
 let currentTopicIndex = 0; 
-let hasLoadedNews = false; // 뉴스 로드 여부 체크 변수
+let hasLoadedNews = false;
 
 function refreshNews() {
   fetchRealNews();
@@ -1341,7 +1242,7 @@ async function fetchRealNews() {
     if (data.status === 'ok') {
       container.innerHTML = ""; 
       
-      hasLoadedNews = true; // 로드 성공 표시
+      hasLoadedNews = true; // 로드 성공 플래그
 
       let allArticles = data.items.slice(0, 15); 
       const shuffled = allArticles.sort(() => 0.5 - Math.random());
@@ -1446,8 +1347,8 @@ loadMemorizedData();
 // 2. TTS 초기화
 loadVoices();
 
-// 3. 초기 화면 렌더링 (중복 히스토리 방지: replace)
-// [중요] 앱 초기화 시에는 히스토리를 '교체'하여 뒤로 가기 스택이 1개(홈)만 남도록 함
+// 3. 초기 화면 렌더링 (중복 히스토리 방지: 강력한 replace)
+// [핵심] 앱 실행 시 무조건 히스토리 1개만 남김
 const initialPage = location.hash.replace('#', '') || 'home';
-switchPage(initialPage); // 화면만 그림
-history.replaceState({ page: initialPage }, "", "#" + initialPage); // 기록 덮어씌움
+switchPage(initialPage); 
+history.replaceState({ page: initialPage }, "", "#" + initialPage);
