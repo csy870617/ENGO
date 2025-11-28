@@ -100,7 +100,6 @@ function goTo(page) {
 // ==========================================
 function loadMemorizedData() {
   try {
-    // 암기 데이터 로드
     const pRaw = localStorage.getItem("patternMemorizedIds");
     if (pRaw) memorizedPatterns = new Set(JSON.parse(pRaw));
 
@@ -110,7 +109,6 @@ function loadMemorizedData() {
     const iRaw = localStorage.getItem("idiomMemorizedIds");
     if (iRaw) memorizedIdioms = new Set(JSON.parse(iRaw));
 
-    // 필터 상태(미암기만 보기) 로드
     const pStudyRaw = localStorage.getItem("patternStudyingOnly");
     if (pStudyRaw !== null) patternStudyingOnly = (pStudyRaw === 'true');
 
@@ -120,7 +118,6 @@ function loadMemorizedData() {
     const iStudyRaw = localStorage.getItem("idiomStudyingOnly");
     if (iStudyRaw !== null) idiomStudyingOnly = (iStudyRaw === 'true');
 
-    // [수정됨] 레벨 선택 상태 로드
     const wLevelRaw = localStorage.getItem("selectedWordLevel");
     if (wLevelRaw !== null) selectedWordLevel = parseInt(wLevelRaw);
 
@@ -261,13 +258,11 @@ function renderWordList() {
   const container = document.getElementById("word-list");
   if (!container || typeof wordData === "undefined") return;
   
-  // 필터 버튼 UI 상태 동기화
   const filterBtn = document.getElementById("word-studying-btn");
   if (filterBtn) {
     filterBtn.classList.toggle("active", wordStudyingOnly);
   }
 
-  // [수정됨] 레벨 버튼 UI 상태 동기화 (재접속 시 반영)
   document.querySelectorAll("[data-word-level-btn]").forEach(b => {
     b.classList.toggle("active", parseInt(b.dataset.wordLevelBtn) === selectedWordLevel);
   });
@@ -322,10 +317,7 @@ function updateWordProgress() {
 
 function setWordLevel(lvl) {
   selectedWordLevel = lvl;
-  // [수정됨] 레벨 저장
   localStorage.setItem("selectedWordLevel", lvl);
-  
-  // 버튼 UI 갱신은 renderWordList에서 처리
   renderWordList();
 }
 
@@ -395,7 +387,6 @@ function renderIdiomList() {
     filterBtn.classList.toggle("active", idiomStudyingOnly);
   }
 
-  // [수정됨] 레벨 버튼 UI 상태 동기화
   document.querySelectorAll("[data-idiom-level-btn]").forEach(b => {
     b.classList.toggle("active", parseInt(b.dataset.idiomLevelBtn) === selectedIdiomLevel);
   });
@@ -446,7 +437,6 @@ function updateIdiomProgress() {
 
 function setIdiomLevel(lvl) {
   selectedIdiomLevel = lvl;
-  // [수정됨] 레벨 저장
   localStorage.setItem("selectedIdiomLevel", lvl);
   renderIdiomList();
 }
@@ -1186,16 +1176,7 @@ document.body.addEventListener('click', function unlockTTS() {
 }, { once: true });
 
 // ==========================================
-// 13. 페이지 종료 전 저장 유도
-// ==========================================
-window.addEventListener('beforeunload', (e) => {
-  e.preventDefault();
-  e.returnValue = ''; 
-  openSyncModal(false);
-});
-
-// ==========================================
-// 14. PWA 설치 배너 로직
+// 13. PWA 설치 배너 로직
 // ==========================================
 let deferredPrompt;
 const installBanner = document.getElementById('install-banner');
@@ -1234,7 +1215,7 @@ window.addEventListener('appinstalled', () => {
 });
 
 // ==========================================
-// 15. 공유 기능
+// 14. 공유 기능
 // ==========================================
 const KAKAO_JS_KEY = 'YOUR_KAKAO_JS_KEY'; 
 
@@ -1297,7 +1278,7 @@ function shareApp() {
 }
 
 // ==========================================
-// 16. 실시간 영어 뉴스 로더 (수동 새로고침)
+// 15. 실시간 영어 뉴스 로더 (수동 새로고침)
 // ==========================================
 const NEWS_TOPICS = [
   "https://news.google.com/rss/search?q=South+Korea+(k-pop+OR+k-drama+OR+movie)+(popular+OR+success)&hl=en-US&gl=US&ceid=US:en",
