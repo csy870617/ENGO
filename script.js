@@ -40,14 +40,14 @@ let currentConvList = [];
 
 let selectedWordLevel = 0;
 let memorizedWords = new Set();
-let wordStudyingOnly = false; // [저장 대상]
+let wordStudyingOnly = false;
 
 let selectedIdiomLevel = 0;
 let memorizedIdioms = new Set();
-let idiomStudyingOnly = false; // [저장 대상]
+let idiomStudyingOnly = false;
 
 let memorizedPatterns = new Set();
-let patternStudyingOnly = false; // [저장 대상]
+let patternStudyingOnly = false;
 
 let currentShadowingId = null;
 let shadowingLineIndex = 0;
@@ -100,7 +100,6 @@ function goTo(page) {
 // ==========================================
 function loadMemorizedData() {
   try {
-    // 암기 데이터 로드
     const pRaw = localStorage.getItem("patternMemorizedIds");
     if (pRaw) memorizedPatterns = new Set(JSON.parse(pRaw));
 
@@ -110,7 +109,6 @@ function loadMemorizedData() {
     const iRaw = localStorage.getItem("idiomMemorizedIds");
     if (iRaw) memorizedIdioms = new Set(JSON.parse(iRaw));
 
-    // [수정됨] 필터 상태(미암기만 보기) 로드
     const pStudyRaw = localStorage.getItem("patternStudyingOnly");
     if (pStudyRaw !== null) patternStudyingOnly = (pStudyRaw === 'true');
 
@@ -134,7 +132,6 @@ function renderPatternList() {
   const container = document.getElementById("pattern-list");
   if (!container || typeof patternData === "undefined") return;
 
-  // [수정됨] 필터 버튼 UI 상태 동기화
   const filterBtn = document.getElementById("pattern-studying-btn");
   if (filterBtn) {
     filterBtn.classList.toggle("active", patternStudyingOnly);
@@ -169,7 +166,6 @@ function renderPatternList() {
       if (check.checked) memorizedPatterns.add(p.id);
       else memorizedPatterns.delete(p.id);
       saveData('pattern');
-      // 목록에서는 즉시 반영
       if (patternStudyingOnly) renderPatternList(); 
       else updatePatternProgress();
     };
@@ -232,10 +228,7 @@ function renderPatternExamples() {
 
 function togglePatternStudying() {
   patternStudyingOnly = !patternStudyingOnly;
-  
-  // [수정됨] 필터 상태 저장
   localStorage.setItem("patternStudyingOnly", patternStudyingOnly);
-  
   renderPatternList();
 }
 
@@ -259,7 +252,6 @@ function renderWordList() {
   const container = document.getElementById("word-list");
   if (!container || typeof wordData === "undefined") return;
   
-  // [수정됨] 필터 버튼 UI 상태 동기화
   const filterBtn = document.getElementById("word-studying-btn");
   if (filterBtn) {
     filterBtn.classList.toggle("active", wordStudyingOnly);
@@ -321,10 +313,7 @@ function setWordLevel(lvl) {
 
 function toggleWordStudying() {
   wordStudyingOnly = !wordStudyingOnly;
-  
-  // [수정됨] 필터 상태 저장
   localStorage.setItem("wordStudyingOnly", wordStudyingOnly);
-  
   renderWordList();
 }
 
@@ -383,7 +372,6 @@ function renderIdiomList() {
   const container = document.getElementById("idiom-list");
   if (!container) return;
   
-  // [수정됨] 필터 버튼 UI 상태 동기화
   const filterBtn = document.getElementById("idiom-studying-btn");
   if (filterBtn) {
     filterBtn.classList.toggle("active", idiomStudyingOnly);
@@ -441,10 +429,7 @@ function setIdiomLevel(lvl) {
 
 function toggleIdiomStudying() {
   idiomStudyingOnly = !idiomStudyingOnly;
-  
-  // [수정됨] 필터 상태 저장
   localStorage.setItem("idiomStudyingOnly", idiomStudyingOnly);
-  
   renderIdiomList();
 }
 
@@ -1012,9 +997,12 @@ if (typeof firebase !== "undefined") {
   try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); } catch (e) { console.error(e); }
 }
 
-function openSyncModal() {
-  const currentPage = history.state ? history.state.page : 'home';
-  history.pushState({ page: currentPage, modal: 'sync' }, "", "#sync");
+// [수정됨] 동기화 모달 (히스토리 추가 옵션화)
+function openSyncModal(pushHistory = true) {
+  if (pushHistory) {
+    const currentPage = history.state ? history.state.page : 'home';
+    history.pushState({ page: currentPage, modal: 'sync' }, "", "#sync");
+  }
 
   document.getElementById("sync-modal").classList.remove("hidden");
   
@@ -1180,7 +1168,8 @@ document.body.addEventListener('click', function unlockTTS() {
 window.addEventListener('beforeunload', (e) => {
   e.preventDefault();
   e.returnValue = ''; 
-  openSyncModal();
+  // 종료 시에는 히스토리 추가 없이 모달만 표시
+  openSyncModal(false);
 });
 
 // ==========================================
@@ -1286,7 +1275,7 @@ function shareApp() {
 }
 
 // ==========================================
-// 16. [수정됨] 실시간 영어 뉴스 로더 (랜덤 셔플 적용)
+// 16. 실시간 영어 뉴스 로더 (수동 새로고침)
 // ==========================================
 const NEWS_TOPICS = [
   "https://news.google.com/rss/search?q=South+Korea+(k-pop+OR+k-drama+OR+movie)+(popular+OR+success)&hl=en-US&gl=US&ceid=US:en",
@@ -1316,13 +1305,9 @@ async function fetchRealNews() {
     const data = await response.json();
 
     if (data.status === 'ok') {
-      container.innerHTML = ""; // 초기화
+      container.innerHTML = ""; 
       
-      // [핵심 변경] 최신 기사 15개를 가져와서 -> 무작위로 섞은 뒤 -> 3개만 뽑음
-      // 이렇게 하면 버튼 누를 때마다 계속 다른 기사 조합이 나옴
       let allArticles = data.items.slice(0, 15); 
-      
-      // 랜덤 섞기 (Fisher-Yates Shuffle 간단 버전)
       const shuffled = allArticles.sort(() => 0.5 - Math.random());
       const selectedArticles = shuffled.slice(0, 3);
 
@@ -1336,7 +1321,6 @@ async function fetchRealNews() {
         card.className = 'news-card';
         card.onclick = () => window.open(item.link, '_blank');
 
-        // 주제별 태그 이름
         let topicTag = "#Trending";
         if (currentTopicIndex === 0) topicTag = "#K-Culture";
         else if (currentTopicIndex === 1) topicTag = "#Tech&Biz";
@@ -1357,7 +1341,6 @@ async function fetchRealNews() {
         container.appendChild(card);
       });
 
-      // 다음 주제로 변경
       currentTopicIndex = (currentTopicIndex + 1) % NEWS_TOPICS.length;
 
     } else {
@@ -1369,7 +1352,6 @@ async function fetchRealNews() {
   }
 }
 
-// ... (loadBackupNews, getTimeAgo 등 아래 코드는 그대로 유지) ...
 function loadBackupNews() {
   const container = document.getElementById('news-card-list');
   const newsData = [
@@ -1423,7 +1405,6 @@ function getTimeAgo(date) {
   return "Just now";
 }
 
-// 최초 1회 실행 (자동 갱신 X)
 function initNewsUpdater() {
   fetchRealNews(); 
 }
@@ -1437,5 +1418,3 @@ if (typeof patternData !== "undefined") updatePatternProgress();
 if (typeof wordData !== "undefined") updateWordProgress();
 if (typeof idiomData !== "undefined") updateIdiomProgress();
 goTo("home");
-
-
