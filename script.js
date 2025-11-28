@@ -38,7 +38,6 @@ let currentWordList = [];
 let currentIdiomList = [];
 let currentConvList = [];
 
-// 설정 변수 (저장 대상)
 let selectedWordLevel = 0;
 let memorizedWords = new Set();
 let wordStudyingOnly = false;
@@ -53,48 +52,49 @@ let patternStudyingOnly = false;
 let currentShadowingId = null;
 let shadowingLineIndex = 0;
 
-// [중요] 뉴스 로드 상태를 추적하는 변수 (중복 실행 방지)
-let isNewsLoaded = false; 
-let isBackAction = false;
+// 뉴스 로드 상태 확인 (중복 실행 방지)
+let isNewsLoaded = false;
 
 // ==========================================
-// 2. 네비게이션 (히스토리 API 로직 완전 분리)
+// 2. 네비게이션 (히스토리 API - 무한루프 방지 로직)
 // ==========================================
 
 // [뒤로가기 감지]
-window.onpopstate = function(event) {
-  // 1. 모달이 떠있으면 닫기만 함
+window.addEventListener('popstate', function(event) {
+  // 모달 닫기 우선 처리
   const openModals = document.querySelectorAll('.modal:not(.hidden)');
   if (openModals.length > 0) {
     openModals.forEach(modal => modal.classList.add('hidden'));
-    return;
+    // 모달만 닫고 페이지 이동 로직은 수행하지 않음 (주소는 이미 변했으므로 그에 맞게 렌더링)
   }
 
-  // 2. 히스토리 state가 있으면 해당 페이지로, 없으면(null) 홈으로
-  // 주의: 여기서 fetchRealNews()를 절대 호출하지 않음
-  const page = (event.state && event.state.page) ? event.state.page : 'home';
+  // 현재 해시값 읽기 (없으면 빈 문자열 -> 홈으로 간주)
+  const hashPage = location.hash.replace('#', '');
+  const targetPage = hashPage || 'home';
   
-  isBackAction = true;
-  renderPageOnly(page); 
-  isBackAction = false;
-};
+  renderPageOnly(targetPage);
+});
 
-// [버튼 클릭 이동]
+// [페이지 이동] 버튼 클릭 시
 function goTo(page) {
   if ("speechSynthesis" in window) {
     window.speechSynthesis.cancel();
   }
 
   // 현재 페이지와 같으면 이동 안 함
-  if (history.state && history.state.page === page) return;
+  const currentHash = location.hash.replace('#', '') || 'home';
+  if (currentHash === page) return;
 
-  // 기록 추가
+  // 기록 추가 (Push)
   history.pushState({ page: page }, "", "#" + page);
   renderPageOnly(page);
 }
 
-// [화면 그리기 전용] - 뉴스 로딩 로직 없음!
+// [화면 그리기 전용] - 히스토리 조작 없음, 뉴스 로딩 없음
 function renderPageOnly(page) {
+  // page가 유효한지 확인, 아니면 home
+  if (!pages.includes(page)) page = 'home';
+
   pages.forEach((p) => {
     const el = document.getElementById("page-" + p);
     if (!el) return;
@@ -102,7 +102,7 @@ function renderPageOnly(page) {
     else el.classList.add("hidden");
   });
 
-  // 각 페이지별 렌더링 함수 호출
+  // 페이지별 데이터 렌더링
   if (page === "patterns") renderPatternList();
   if (page === "words") renderWordList();
   if (page === "idioms") renderIdiomList();
@@ -112,29 +112,26 @@ function renderPageOnly(page) {
 }
 
 // ==========================================
-// 3. 앱 초기화 (DOMContentLoaded)
+// 3. 앱 초기화 (Start Logic) - [핵심 수정]
 // ==========================================
 window.addEventListener('DOMContentLoaded', () => {
   // 1. 데이터 로드
   loadMemorizedData();
   loadVoices();
 
-  // 2. 뉴스 로드 (앱 실행 시 단 1회만 실행됨)
+  // 2. 뉴스 로드 (앱 켤 때 단 1번만!)
   if (!isNewsLoaded) {
     fetchRealNews();
     isNewsLoaded = true;
   }
 
-  // 3. 초기 화면 설정 (히스토리 스택 1개로 고정)
-  // 현재 URL의 해시가 있으면 그 페이지로, 없으면 홈으로
-  const hashPage = location.hash.replace('#', '');
-  const startPage = pages.includes(hashPage) ? hashPage : 'home';
-
-  // [핵심] pushState가 아니라 replaceState를 사용하여 현재 기록을 덮어씀
-  // 이렇게 하면 "이전 페이지"가 존재하지 않게 되어 뒤로가기 시 바로 종료됨
-  history.replaceState({ page: startPage }, "", "#" + startPage);
+  // 3. 초기 화면 결정
+  // [중요] history.replaceState를 쓰지 않습니다.
+  // 브라우저가 처음에 있는 주소 그대로를 사용하게 둡니다.
+  // 주소에 #이 없으면 그냥 홈을 보여줍니다. (기록이 안 쌓임 -> 뒤로가기 시 종료됨)
+  const initialHash = location.hash.replace('#', '');
+  const startPage = initialHash || 'home';
   
-  // 화면 그리기
   renderPageOnly(startPage);
 });
 
@@ -218,13 +215,11 @@ function renderPatternList() {
 
 function updatePatternProgress() {
   if (typeof patternData === "undefined") return;
-  const label = document.getElementById("pattern-progress");
-  const bar = document.getElementById("pattern-progress-bar");
   const total = patternData.length;
   const done = patternData.filter(p => memorizedPatterns.has(p.id)).length;
   const percent = total === 0 ? 0 : Math.round((done / total) * 100);
-  if (label) label.textContent = `패턴 암기 ${done} / ${total}개 (${percent}%)`;
-  if (bar) bar.style.width = `${percent}%`;
+  document.getElementById("pattern-progress").textContent = `패턴 암기 ${done} / ${total}개 (${percent}%)`;
+  document.getElementById("pattern-progress-bar").style.width = `${percent}%`;
 }
 
 function openPattern(id) {
@@ -332,10 +327,8 @@ function updateWordProgress() {
   const total = pool.length;
   const done = pool.filter(w => memorizedWords.has(w.id)).length;
   const percent = total === 0 ? 0 : Math.round((done/total)*100);
-  const label = document.getElementById("word-progress");
-  const bar = document.getElementById("word-progress-bar");
-  if (label) label.textContent = `현재 레벨 기준 암기 ${done} / ${total}개 (${percent}%)`;
-  if (bar) bar.style.width = `${percent}%`;
+  document.getElementById("word-progress").textContent = `현재 레벨 기준 암기 ${done} / ${total}개 (${percent}%)`;
+  document.getElementById("word-progress-bar").style.width = `${percent}%`;
 }
 
 function setWordLevel(lvl) {
@@ -572,7 +565,6 @@ function startShadowingFromConv(id) {
   currentShadowingId = id;
   shadowingLineIndex = 0;
   goTo("shadowing");
-  
   isBlindMode = true; 
   isHideKr = false;
   updateShadowingOptionsUI();
@@ -598,9 +590,6 @@ function moveConv(o) { moveItemInList(currentConvId, currentConvList, o, openCon
 // ==========================================
 // 9. 쉐도잉 (Shadowing)
 // ==========================================
-let isBlindMode = false;
-let isHideKr = false;
-
 function renderShadowingList() {
   const container = document.getElementById("shadowing-list-container");
   if (!container || typeof conversationData === "undefined") return;
@@ -715,14 +704,8 @@ function nextRandomShadowingTopic() {
 }
 
 // ==========================================
-// 10. 문장 퍼즐 (Puzzle)
+// 10. 문장 퍼즐
 // ==========================================
-let puzzleList = [];
-let currentPuzzleIndex = 0;
-let currentPuzzleAnswer = "";
-let puzzleTargetTokens = [];
-let puzzleShuffledTokens = [];
-
 function initPuzzle() {
   if (puzzleList.length === 0) {
     let pool = [];
@@ -796,7 +779,9 @@ function checkPuzzle() {
 }
 function resetPuzzle() {
   puzzleTargetTokens = [];
-  document.getElementById("puzzle-feedback").textContent = "";
+  const fb = document.getElementById("puzzle-feedback");
+  fb.textContent = "";
+  fb.style.color = "";
   updatePuzzleBoard();
 }
 function showPuzzleAnswer() {
@@ -816,12 +801,6 @@ function movePuzzle(offset) {
 // ==========================================
 // 11. TTS 및 설정
 // ==========================================
-let ttsVoices = [];
-let userVoiceIndex = null;
-let userRate = 1.0;
-let userFontSize = 'medium'; 
-let autoPlayEnabled = true;
-
 function loadVoices() {
   ttsVoices = window.speechSynthesis.getVoices();
   const sel = document.getElementById("tts-voice-select");
@@ -1023,12 +1002,12 @@ document.body.addEventListener('click', function unlockTTS() {
 }, { once: true });
 
 // ==========================================
-// 14. PWA
+// 14. PWA / 공유
 // ==========================================
 let deferredPrompt;
 const installBanner = document.getElementById('install-banner');
 window.addEventListener('beforeinstallprompt', (e) => {
-  console.log("✅ PWA Ready"); e.preventDefault(); deferredPrompt = e;
+  e.preventDefault(); deferredPrompt = e;
   if (!localStorage.getItem('installBannerDismissed')) installBanner.classList.remove('hidden');
 });
 async function installPWA() {
@@ -1040,29 +1019,22 @@ async function installPWA() {
 function hideInstallBanner() { installBanner.classList.add('hidden'); localStorage.setItem('installBannerDismissed', 'true'); }
 window.addEventListener('appinstalled', () => { installBanner.classList.add('hidden'); deferredPrompt = null; });
 
-// ==========================================
-// 15. 공유
-// ==========================================
 const KAKAO_JS_KEY = 'YOUR_KAKAO_JS_KEY'; 
-if (typeof Kakao !== 'undefined' && KAKAO_JS_KEY !== 'YOUR_KAKAO_JS_KEY') { try { if (!Kakao.isInitialized()) Kakao.init(KAKAO_JS_KEY); } catch(e) { console.log("Kakao init failed", e); } }
+if (typeof Kakao !== 'undefined' && KAKAO_JS_KEY !== 'YOUR_KAKAO_JS_KEY') { try { if (!Kakao.isInitialized()) Kakao.init(KAKAO_JS_KEY); } catch(e) {} }
 function shareApp() {
   if (typeof Kakao !== 'undefined' && Kakao.isInitialized()) {
     try {
       Kakao.Share.sendDefault({
         objectType: 'feed', content: { title: 'English & Go', description: '오늘의 영어 정복을 시작해볼까요? 영어회화 공부 ENGO와 함께해요.', imageUrl: window.location.origin + '/icon.png', link: { mobileWebUrl: window.location.href, webUrl: window.location.href } }, buttons: [ { title: '함께 공부하기', link: { mobileWebUrl: window.location.href, webUrl: window.location.href } } ]
       }); return;
-    } catch(e) { console.log("Kakao share failed..."); }
+    } catch(e) {}
   }
-  if (navigator.share) {
-    navigator.share({ title: 'English & Go', text: '오늘의 영어 정복을 시작해볼까요? 영어회화 공부 ENGO와 함께해요.', url: window.location.href }).catch(console.log);
-  } else {
-    const dummy = document.createElement('input'); document.body.appendChild(dummy); dummy.value = window.location.href; dummy.select(); document.execCommand('copy'); document.body.removeChild(dummy);
-    alert("링크가 복사되었습니다! 친구에게 붙여넣기 해보세요.");
-  }
+  if (navigator.share) navigator.share({ title: 'English & Go', text: '오늘의 영어 정복을 시작해볼까요? 영어회화 공부 ENGO와 함께해요.', url: window.location.href }).catch(console.log);
+  else { const dummy = document.createElement('input'); document.body.appendChild(dummy); dummy.value = window.location.href; dummy.select(); document.execCommand('copy'); document.body.removeChild(dummy); alert("링크가 복사되었습니다!"); }
 }
 
 // ==========================================
-// 16. 실시간 뉴스 로더 (완전 분리형)
+// 16. 뉴스 (API)
 // ==========================================
 const NEWS_TOPICS = [
   "https://news.google.com/rss/search?q=South+Korea+(k-pop+OR+k-drama+OR+movie)+(popular+OR+success)&hl=en-US&gl=US&ceid=US:en",
@@ -1070,6 +1042,7 @@ const NEWS_TOPICS = [
   "https://news.google.com/rss/search?q=South+Korea+(food+OR+travel+OR+trend)+(viral+OR+famous)&hl=en-US&gl=US&ceid=US:en"
 ];
 let currentTopicIndex = 0; 
+let hasLoadedNews = false;
 
 function refreshNews() { fetchRealNews(true); }
 
@@ -1077,7 +1050,7 @@ async function fetchRealNews(force = false) {
   const container = document.getElementById('news-card-list');
   if (!container) return;
 
-  // 강제 새로고침이 아니고, 이미 뉴스가 있다면 로드 안함
+  // 강제 새로고침이 아니고 이미 뉴스가 있다면 패스
   if (!force && container.children.length > 0) return;
 
   container.innerHTML = `<div style="padding:30px; text-align:center; color:#94a3b8; font-size:0.9rem; width:100%;">🔄 Mixing fresh stories...</div>`;
@@ -1090,6 +1063,7 @@ async function fetchRealNews(force = false) {
     const data = await response.json();
     if (data.status === 'ok') {
       container.innerHTML = ""; 
+      
       let allArticles = data.items.slice(0, 15); 
       const shuffled = allArticles.sort(() => 0.5 - Math.random());
       const selectedArticles = shuffled.slice(0, 3);
