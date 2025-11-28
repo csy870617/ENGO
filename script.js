@@ -52,50 +52,49 @@ let patternStudyingOnly = false;
 let currentShadowingId = null;
 let shadowingLineIndex = 0;
 
-let isBackAction = false; 
-
 // ==========================================
-// 2. 네비게이션 (히스토리 API 최적화)
+// 2. 네비게이션 (히스토리 로직 완전 분리)
 // ==========================================
 
-// 뒤로가기 버튼 감지
+// [뒤로가기] 사용자가 뒤로가기를 눌렀을 때만 발생
 window.onpopstate = function(event) {
+  // 모달 닫기 우선
   const openModals = document.querySelectorAll('.modal:not(.hidden)');
   if (openModals.length > 0) {
     openModals.forEach(modal => modal.classList.add('hidden'));
-    return;
+    return; 
   }
 
-  // 히스토리가 없으면(앱 종료 직전) null일 수 있음 -> home으로 처리하되 기록은 안 남김
-  const page = (event.state && event.state.page) ? event.state.page : 'home';
-  
-  isBackAction = true;
-  renderPageOnly(page); // [중요] 화면만 갱신하고 뉴스는 건드리지 않음
-  isBackAction = false;
+  // 히스토리 상태에 따라 화면만 전환 (데이터 로딩 X)
+  const targetPage = (event.state && event.state.page) ? event.state.page : 'home';
+  showPage(targetPage);
 };
 
-// 버튼 클릭 시 이동 (기록 추가)
+// [페이지 이동] 버튼 클릭 시 호출
 function goTo(page) {
   if ("speechSynthesis" in window) {
     window.speechSynthesis.cancel();
   }
 
+  // 중복 이동 방지
   if (history.state && history.state.page === page) return;
 
+  // 기록 추가
   history.pushState({ page: page }, "", "#" + page);
-  renderPageOnly(page);
+  showPage(page);
 }
 
-// 순수 화면 변경 함수 (뉴스 로딩 로직 제거됨)
-function renderPageOnly(page) {
+// [화면 전환] 순수하게 DOM의 hidden 클래스만 조작 (뉴스 로딩 기능 없음)
+function showPage(page) {
   pages.forEach((p) => {
     const el = document.getElementById("page-" + p);
-    if (!el) return;
-    if (p === page) el.classList.remove("hidden");
-    else el.classList.add("hidden");
+    if (el) {
+      if (p === page) el.classList.remove("hidden");
+      else el.classList.add("hidden");
+    }
   });
 
-  // 페이지별 렌더링
+  // 각 페이지 데이터 렌더링 (뉴스는 여기서 부르지 않음!)
   if (page === "patterns") renderPatternList();
   if (page === "words") renderWordList();
   if (page === "idioms") renderIdiomList();
@@ -105,7 +104,7 @@ function renderPageOnly(page) {
 }
 
 // ==========================================
-// 3. 데이터 저장/로드 (LocalStorage)
+// 3. 데이터 저장/로드
 // ==========================================
 function loadMemorizedData() {
   try {
@@ -132,20 +131,25 @@ function loadMemorizedData() {
 }
 
 function saveData(type) {
-  saveDataLocally(type);
+  if (type === 'pattern') localStorage.setItem("patternMemorizedIds", JSON.stringify(Array.from(memorizedPatterns)));
+  if (type === 'word') localStorage.setItem("wordMemorizedIds", JSON.stringify(Array.from(memorizedWords)));
+  if (type === 'idiom') localStorage.setItem("idiomMemorizedIds", JSON.stringify(Array.from(memorizedIdioms)));
+  
+  // 진행도 UI 즉시 업데이트
+  if (type === 'pattern') updatePatternProgress();
+  if (type === 'word') updateWordProgress();
+  if (type === 'idiom') updateIdiomProgress();
 }
 
 // ==========================================
-// 4. 패턴 (Patterns) 로직
+// 4. 패턴 (Patterns)
 // ==========================================
 function renderPatternList() {
   const container = document.getElementById("pattern-list");
   if (!container || typeof patternData === "undefined") return;
 
   const filterBtn = document.getElementById("pattern-studying-btn");
-  if (filterBtn) {
-    filterBtn.classList.toggle("active", patternStudyingOnly);
-  }
+  if (filterBtn) filterBtn.classList.toggle("active", patternStudyingOnly);
 
   const keyword = (document.getElementById("pattern-search")?.value || "").toLowerCase();
   container.innerHTML = "";
@@ -155,7 +159,6 @@ function renderPatternList() {
     const matchStudy = !patternStudyingOnly || !memorizedPatterns.has(p.id);
     return matchText && matchStudy;
   });
-
   currentPatternList = filtered;
 
   filtered.forEach((p) => {
@@ -173,31 +176,25 @@ function renderPatternList() {
     check.checked = memorizedPatterns.has(p.id);
     check.onclick = (e) => {
       e.stopPropagation();
-      if (check.checked) memorizedPatterns.add(p.id);
-      else memorizedPatterns.delete(p.id);
+      if (check.checked) memorizedPatterns.add(p.id); else memorizedPatterns.delete(p.id);
       saveData('pattern');
-      if (patternStudyingOnly) renderPatternList(); 
-      else updatePatternProgress();
+      if (patternStudyingOnly) renderPatternList(); else updatePatternProgress();
     };
-
     div.appendChild(left);
     div.appendChild(check);
     container.appendChild(div);
   });
-  
   if (filtered.length === 0) container.innerHTML = '<div class="list-item"><div>검색 결과가 없습니다.</div></div>';
   updatePatternProgress();
 }
 
 function updatePatternProgress() {
   if (typeof patternData === "undefined") return;
-  const label = document.getElementById("pattern-progress");
-  const bar = document.getElementById("pattern-progress-bar");
   const total = patternData.length;
   const done = patternData.filter(p => memorizedPatterns.has(p.id)).length;
   const percent = total === 0 ? 0 : Math.round((done / total) * 100);
-  if (label) label.textContent = `패턴 암기 ${done} / ${total}개 (${percent}%)`;
-  if (bar) bar.style.width = `${percent}%`;
+  document.getElementById("pattern-progress").textContent = `패턴 암기 ${done} / ${total}개 (${percent}%)`;
+  document.getElementById("pattern-progress-bar").style.width = `${percent}%`;
 }
 
 function openPattern(id) {
@@ -206,15 +203,11 @@ function openPattern(id) {
   if (!pattern) return;
   document.getElementById("pattern-title").textContent = pattern.title;
   document.getElementById("pattern-desc").textContent = pattern.desc;
-  const memCheck = document.getElementById("pattern-memorized-checkbox");
-  if (memCheck) memCheck.checked = memorizedPatterns.has(id);
+  document.getElementById("pattern-memorized-checkbox").checked = memorizedPatterns.has(id);
   document.getElementById("pattern-toggle-kr").checked = true;
   renderPatternExamples();
   goTo("pattern-detail");
-
-  if (autoPlayEnabled) {
-      playPatternExamples();
-    }
+  if (autoPlayEnabled) playPatternExamples();
 }
 
 function renderPatternExamples() {
@@ -244,10 +237,9 @@ function togglePatternStudying() {
 
 function togglePatternMemorizedDetail() {
   const chk = document.getElementById("pattern-memorized-checkbox");
-  if (chk.checked) memorizedPatterns.add(currentPatternId);
-  else memorizedPatterns.delete(currentPatternId);
+  if (chk.checked) memorizedPatterns.add(currentPatternId); else memorizedPatterns.delete(currentPatternId);
   saveData('pattern');
-  updatePatternProgress(); 
+  updatePatternProgress();
 }
 
 function playPatternExamples() {
@@ -256,17 +248,13 @@ function playPatternExamples() {
 }
 
 // ==========================================
-// 5. 단어 (Words) 로직
+// 5. 단어 (Words)
 // ==========================================
 function renderWordList() {
   const container = document.getElementById("word-list");
   if (!container || typeof wordData === "undefined") return;
   
-  const filterBtn = document.getElementById("word-studying-btn");
-  if (filterBtn) {
-    filterBtn.classList.toggle("active", wordStudyingOnly);
-  }
-
+  document.getElementById("word-studying-btn").classList.toggle("active", wordStudyingOnly);
   document.querySelectorAll("[data-word-level-btn]").forEach(b => {
     b.classList.toggle("active", parseInt(b.dataset.wordLevelBtn) === selectedWordLevel);
   });
@@ -281,7 +269,6 @@ function renderWordList() {
     const matchStudy = !wordStudyingOnly || !memorizedWords.has(w.id);
     return matchText && matchLevel && matchStudy;
   });
-
   currentWordList = filtered;
 
   filtered.forEach(w => {
@@ -313,10 +300,8 @@ function updateWordProgress() {
   const total = pool.length;
   const done = pool.filter(w => memorizedWords.has(w.id)).length;
   const percent = total === 0 ? 0 : Math.round((done/total)*100);
-  const label = document.getElementById("word-progress");
-  const bar = document.getElementById("word-progress-bar");
-  if (label) label.textContent = `현재 레벨 기준 암기 ${done} / ${total}개 (${percent}%)`;
-  if (bar) bar.style.width = `${percent}%`;
+  document.getElementById("word-progress").textContent = `현재 레벨 기준 암기 ${done} / ${total}개 (${percent}%)`;
+  document.getElementById("word-progress-bar").style.width = `${percent}%`;
 }
 
 function setWordLevel(lvl) {
@@ -341,11 +326,10 @@ function openWord(id) {
   document.getElementById("word-toggle-kr").checked = true;
   renderWordExamples();
   goTo("word-detail");
-
   if (autoPlayEnabled) {
       const textToRead = `${w.word}. ${w.examples.map(e => e.en).join(". ")}`;
       speakText(textToRead);
-    }
+  }
 }
 
 function renderWordExamples() {
@@ -380,17 +364,13 @@ function playWordExamples() {
 }
 
 // ==========================================
-// 6. 숙어 (Idioms) 로직
+// 6. 숙어 (Idioms)
 // ==========================================
 function renderIdiomList() {
   const container = document.getElementById("idiom-list");
   if (!container) return;
   
-  const filterBtn = document.getElementById("idiom-studying-btn");
-  if (filterBtn) {
-    filterBtn.classList.toggle("active", idiomStudyingOnly);
-  }
-
+  document.getElementById("idiom-studying-btn").classList.toggle("active", idiomStudyingOnly);
   document.querySelectorAll("[data-idiom-level-btn]").forEach(b => {
     b.classList.toggle("active", parseInt(b.dataset.idiomLevelBtn) === selectedIdiomLevel);
   });
@@ -404,7 +384,6 @@ function renderIdiomList() {
     const matchStudy = !idiomStudyingOnly || !memorizedIdioms.has(i.id);
     return matchText && matchLevel && matchStudy;
   });
-
   currentIdiomList = filtered;
 
   filtered.forEach(i => {
@@ -461,11 +440,10 @@ function openIdiom(id) {
   document.getElementById("idiom-toggle-kr").checked = true;
   renderIdiomExamples();
   goTo("idiom-detail");
-
   if (autoPlayEnabled) {
       const textToRead = `${item.idiom}. ${item.examples.map(e => e.en).join(". ")}`;
       speakText(textToRead);
-    }
+  }
 }
 
 function renderIdiomExamples() {
@@ -527,10 +505,7 @@ function openConversation(id) {
   document.getElementById("conv-toggle-kr").checked = true;
   renderConversationDetail();
   goTo("conv-detail");
-
-  if (autoPlayEnabled) {
-      playConversationAll();
-    }
+  if (autoPlayEnabled) playConversationAll();
 }
 
 function renderConversationDetail() {
@@ -573,27 +548,16 @@ function moveItemInList(currentId, list, offset, openFunc) {
     alert("목록이 비어있습니다.");
     return;
   }
-  
   const idx = list.findIndex(item => item.id === currentId);
-  
-  if (idx === -1) {
-    openFunc(list[0].id);
-    return;
-  }
-  
+  if (idx === -1) { openFunc(list[0].id); return; }
   const nextIdx = idx + offset;
-  if (nextIdx >= 0 && nextIdx < list.length) {
-    openFunc(list[nextIdx].id);
-  } else {
-    alert(offset > 0 ? "마지막 항목입니다." : "첫 번째 항목입니다.");
-  }
+  if (nextIdx >= 0 && nextIdx < list.length) openFunc(list[nextIdx].id);
+  else alert(offset > 0 ? "마지막 항목입니다." : "첫 번째 항목입니다.");
 }
-
 function movePattern(o) { moveItemInList(currentPatternId, currentPatternList, o, openPattern); }
 function moveWord(o) { moveItemInList(currentWordId, currentWordList, o, openWord); }
 function moveIdiom(o) { moveItemInList(currentIdiomId, currentIdiomList, o, openIdiom); }
 function moveConv(o) { moveItemInList(currentConvId, currentConvList, o, openConversation); }
-
 
 // ==========================================
 // 8. 쉐도잉 (Shadowing)
@@ -604,14 +568,9 @@ let isHideKr = false;
 function renderShadowingList() {
   const container = document.getElementById("shadowing-list-container");
   if (!container || typeof conversationData === "undefined") return;
-  
   const keyword = (document.getElementById("shadowing-search")?.value || "").toLowerCase();
   container.innerHTML = "";
-  
-  const filtered = conversationData.filter(c => 
-    (c.title + c.lines.map(l => l.en).join(" ")).toLowerCase().includes(keyword)
-  );
-
+  const filtered = conversationData.filter(c => (c.title + c.lines.map(l => l.en).join(" ")).toLowerCase().includes(keyword));
   filtered.forEach(c => {
     const div = document.createElement("div");
     div.className = "list-item";
@@ -619,7 +578,6 @@ function renderShadowingList() {
       currentShadowingId = c.id;
       shadowingLineIndex = 0;
       goTo("shadowing");
-      
       isBlindMode = true; 
       isHideKr = false;
       updateShadowingOptionsUI();
@@ -634,10 +592,7 @@ function renderShadowingList() {
     `;
     container.appendChild(div);
   });
-
-  if (filtered.length === 0) {
-    container.innerHTML = '<div class="list-item"><div>검색 결과가 없습니다.</div></div>';
-  }
+  if (filtered.length === 0) container.innerHTML = '<div class="list-item"><div>검색 결과가 없습니다.</div></div>';
 }
 
 function toggleShadowingOption(type) {
@@ -646,11 +601,9 @@ function toggleShadowingOption(type) {
   updateShadowingOptionsUI();
   updateShadowingUI();
 }
-
 function updateShadowingOptionsUI() {
   const btnBlind = document.getElementById("btn-blind-mode");
   const btnHideKr = document.getElementById("btn-hide-kr");
-  
   if(btnBlind) btnBlind.classList.toggle("active", isBlindMode);
   if(btnHideKr) btnHideKr.classList.toggle("active", isHideKr);
 }
@@ -658,15 +611,11 @@ function updateShadowingOptionsUI() {
 function updateShadowingUI() {
   const conv = conversationData.find(c => c.id === currentShadowingId);
   if (!conv) return;
-
   const line = conv.lines[shadowingLineIndex];
-  
   document.getElementById("shadowing-counter").textContent = `${shadowingLineIndex + 1} / ${conv.lines.length}`;
   document.getElementById("shadowing-speaker").textContent = `Speaker ${line.speaker}`;
-  
   const enText = document.getElementById("shadowing-text");
   enText.textContent = line.en;
-  
   if (isBlindMode) {
     enText.classList.add("blind-text");
     enText.classList.remove("revealed");
@@ -676,85 +625,61 @@ function updateShadowingUI() {
     enText.classList.add("revealed");
     document.getElementById("shadowing-hint").classList.add("hidden");
   }
-
   const krText = document.getElementById("shadowing-kr");
   krText.textContent = line.kr;
   krText.style.visibility = isHideKr ? "hidden" : "visible";
-
-  if (autoPlayEnabled) {
-    speakText(line.en);
-  }
+  if (autoPlayEnabled) speakText(line.en);
 }
 
 function revealTextTemp() {
   const enText = document.getElementById("shadowing-text");
   if (isBlindMode) {
     enText.classList.add("revealed");
-    setTimeout(() => {
-      enText.classList.remove("revealed");
-    }, 2000);
+    setTimeout(() => enText.classList.remove("revealed"), 2000);
   }
 }
-
 function playShadowingCurrent() {
   const btn = document.getElementById("shadowing-play-btn");
   btn.style.transform = "scale(0.95)";
   setTimeout(() => btn.style.transform = "scale(1)", 100);
-
   const conv = conversationData.find(c => c.id === currentShadowingId);
   if (!conv) return;
   speakText(conv.lines[shadowingLineIndex].en);
 }
-
 function nextShadowing() {
   const conv = conversationData.find(c => c.id === currentShadowingId);
   if (!conv) return;
-
   if (shadowingLineIndex < conv.lines.length - 1) {
     shadowingLineIndex++;
     updateShadowingUI();
   } else {
-    if(confirm("대화가 끝났습니다. 목록으로 돌아갈까요?")) {
-      goTo("shadowing-list");
-    } else {
-      shadowingLineIndex = 0;
-      updateShadowingUI();
-    }
+    if(confirm("대화가 끝났습니다. 목록으로 돌아갈까요?")) goTo("shadowing-list");
+    else { shadowingLineIndex = 0; updateShadowingUI(); }
   }
 }
-
 function prevShadowing() {
   if (shadowingLineIndex > 0) {
     shadowingLineIndex--;
     updateShadowingUI();
   }
 }
-
 function nextRandomShadowingTopic() {
-  if ("speechSynthesis" in window) {
-    window.speechSynthesis.cancel();
-  }
-
+  if ("speechSynthesis" in window) window.speechSynthesis.cancel();
   if (!conversationData || conversationData.length === 0) return;
-  
   let nextConv;
   if (conversationData.length > 1) {
     do {
       const randomIndex = Math.floor(Math.random() * conversationData.length);
       nextConv = conversationData[randomIndex];
     } while (nextConv.id === currentShadowingId);
-  } else {
-    nextConv = conversationData[0];
-  }
-  
+  } else { nextConv = conversationData[0]; }
   currentShadowingId = nextConv.id;
   shadowingLineIndex = 0;
-  
   updateShadowingUI();
 }
 
 // ==========================================
-// 9. 문장 퍼즐 (Puzzle)
+// 9. 문장 퍼즐
 // ==========================================
 let puzzleList = [];
 let currentPuzzleIndex = 0;
@@ -792,7 +717,7 @@ function renderPuzzle() {
   document.getElementById("puzzle-question").textContent = target.kr;
   document.getElementById("puzzle-feedback").textContent = "";
   document.getElementById("puzzle-feedback").className = "feedback-msg";
-  document.getElementById("puzzle-feedback").style.color = ""; // 스타일 초기화
+  document.getElementById("puzzle-feedback").style.color = "";
   puzzleTargetTokens = [];
   puzzleShuffledTokens = currentPuzzleAnswer.split(" ").sort(() => Math.random() - 0.5);
   updatePuzzleBoard();
@@ -802,13 +727,11 @@ function updatePuzzleBoard() {
   const bank = document.getElementById("puzzle-bank");
   const target = document.getElementById("puzzle-target");
   bank.innerHTML = ""; target.innerHTML = "";
-  
   const currentBank = [...puzzleShuffledTokens];
   puzzleTargetTokens.forEach(t => {
     const idx = currentBank.indexOf(t);
     if (idx > -1) currentBank.splice(idx, 1);
   });
-  
   currentBank.forEach(t => {
     const span = document.createElement("span");
     span.className = "token";
@@ -828,7 +751,7 @@ function updatePuzzleBoard() {
 function checkPuzzle() {
   const user = puzzleTargetTokens.join(" ");
   const fb = document.getElementById("puzzle-feedback");
-  fb.style.color = ""; // 색상 초기화
+  fb.style.color = "";
   if (user === currentPuzzleAnswer) {
     fb.textContent = "정답입니다! 🎉";
     fb.className = "feedback ok";
@@ -838,39 +761,32 @@ function checkPuzzle() {
     fb.className = "feedback error";
   }
 }
-
 function resetPuzzle() {
   puzzleTargetTokens = [];
-  const fb = document.getElementById("puzzle-feedback");
-  fb.textContent = "";
-  fb.style.color = "";
+  document.getElementById("puzzle-feedback").textContent = "";
   updatePuzzleBoard();
 }
-
 function showPuzzleAnswer() {
   const fb = document.getElementById("puzzle-feedback");
   fb.textContent = `정답: ${currentPuzzleAnswer}`;
   fb.className = "feedback-msg";
   fb.style.color = "#38bdf8";
 }
-
 function movePuzzle(offset) {
   const newIndex = currentPuzzleIndex + offset;
   if (newIndex >= 0 && newIndex < puzzleList.length) {
     currentPuzzleIndex = newIndex;
     renderPuzzle();
-  } else {
-    alert(offset > 0 ? "마지막 문제입니다." : "첫 번째 문제입니다.");
-  }
+  } else alert(offset > 0 ? "마지막 문제입니다." : "첫 번째 문제입니다.");
 }
 
 // ==========================================
-// 10. TTS 설정, 글자 크기 및 저장
+// 10. TTS 설정 등
 // ==========================================
 let ttsVoices = [];
 let userVoiceIndex = null;
 let userRate = 1.0;
-let userFontSize = 'medium'; // small, medium, large
+let userFontSize = 'medium'; 
 let autoPlayEnabled = true;
 
 function loadVoices() {
@@ -886,7 +802,6 @@ function loadVoices() {
       }
     });
   }
-  
   const raw = localStorage.getItem("ttsSettings");
   if(raw) {
     const d = JSON.parse(raw);
@@ -895,16 +810,12 @@ function loadVoices() {
     if (d.autoPlay !== undefined) autoPlayEnabled = d.autoPlay;
     if (d.fontSize) userFontSize = d.fontSize;
   }
-  
   applyFontSizeToBody(userFontSize);
 }
 if("speechSynthesis" in window) window.speechSynthesis.onvoiceschanged = loadVoices;
 
 function speakText(text) {
-  if (!("speechSynthesis" in window)) {
-    alert("이 브라우저는 음성 합성을 지원하지 않습니다.");
-    return;
-  }
+  if (!("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   u.lang = "en-US";
@@ -913,67 +824,41 @@ function speakText(text) {
   if (userVoiceIndex !== null && ttsVoices[userVoiceIndex]) u.voice = ttsVoices[userVoiceIndex];
   window.speechSynthesis.speak(u);
 }
-
 function openSettingsModal() {
-  const currentPage = history.state ? history.state.page : 'home';
-  history.pushState({ page: currentPage, modal: 'settings' }, "", "#settings");
-
   document.getElementById("settings-modal").classList.remove("hidden");
-  
   const sel = document.getElementById("tts-voice-select");
   const chk = document.getElementById("tts-autoplay-toggle");
-  
   if(sel) sel.value = userVoiceIndex !== null ? userVoiceIndex : "";
   if(chk) chk.checked = autoPlayEnabled;
-
   updateButtonGroup('speed-btn-group', userRate);
   updateButtonGroup('font-btn-group', userFontSize);
 }
-
-function closeSettingsModal() { 
-  if (history.state && history.state.modal === 'settings') {
-    history.back();
-  } else {
-    document.getElementById("settings-modal").classList.add("hidden"); 
-  }
-}
-
+function closeSettingsModal() { document.getElementById("settings-modal").classList.add("hidden"); }
 function updateButtonGroup(groupId, activeValue) {
   const group = document.getElementById(groupId);
   if(!group) return;
   const btns = group.querySelectorAll('button');
   btns.forEach(btn => {
     const btnVal = btn.getAttribute('data-value');
-    if (btnVal == activeValue) {
-      btn.classList.add('active');
-    } else {
-      btn.classList.remove('active');
-    }
+    if (btnVal == activeValue) btn.classList.add('active');
+    else btn.classList.remove('active');
   });
 }
-
 function setTtsRate(rate, btn) {
   userRate = parseFloat(rate);
-  const group = document.getElementById("speed-btn-group");
-  group.querySelectorAll("button").forEach(b => b.classList.remove("active"));
-  btn.classList.add("active");
+  updateButtonGroup('speed-btn-group', userRate);
   previewVoiceSettings();
 }
-
 function setAppFontSize(size, btn) {
   userFontSize = size;
-  const group = document.getElementById("font-btn-group");
-  group.querySelectorAll("button").forEach(b => b.classList.remove("active"));
-  btn.classList.add("active");
+  updateButtonGroup('font-btn-group', userFontSize);
   applyFontSizeToBody(size);
 }
-
 function applyFontSizeToBody(size) {
   const root = document.documentElement; 
   root.classList.remove('font-small', 'font-medium', 'font-large');
   root.classList.add(`font-${size}`);
 }
-
 function previewVoiceSettings() {
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance("Hello.");
@@ -983,17 +868,12 @@ function previewVoiceSettings() {
   if(tempVoice && ttsVoices[tempVoice]) u.voice = ttsVoices[tempVoice];
   window.speechSynthesis.speak(u);
 }
-
 function saveSettings() {
   userVoiceIndex = document.getElementById("tts-voice-select").value || null;
   autoPlayEnabled = document.getElementById("tts-autoplay-toggle").checked;
   localStorage.setItem("ttsSettings", JSON.stringify({ 
-    voiceIndex: userVoiceIndex, 
-    rate: userRate, 
-    autoPlay: autoPlayEnabled,
-    fontSize: userFontSize
+    voiceIndex: userVoiceIndex, rate: userRate, autoPlay: autoPlayEnabled, fontSize: userFontSize
   }));
-  
   closeSettingsModal();
 }
 
@@ -1009,20 +889,12 @@ const firebaseConfig = {
   appId: "1:252712209702:web:5ed2ccb9f07230824d45e7",
   measurementId: "G-KHE07H3HKR"
 };
-
 let db;
 if (typeof firebase !== "undefined") {
   try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); } catch (e) { console.error(e); }
 }
-
-function openSyncModal(pushHistory = true) {
-  if (pushHistory) {
-    const currentPage = history.state ? history.state.page : 'home';
-    history.pushState({ page: currentPage, modal: 'sync' }, "", "#sync");
-  }
-
+function openSyncModal() {
   document.getElementById("sync-modal").classList.remove("hidden");
-  
   const savedAuth = localStorage.getItem("syncAuth");
   if (savedAuth) {
     const authData = JSON.parse(savedAuth);
@@ -1031,157 +903,75 @@ function openSyncModal(pushHistory = true) {
     document.getElementById("sync-remember").checked = true;
   }
 }
-
-function closeSyncModal() { 
-  if (history.state && history.state.modal === 'sync') {
-    history.back();
-  } else {
-    document.getElementById("sync-modal").classList.add("hidden"); 
-  }
-}
-
+function closeSyncModal() { document.getElementById("sync-modal").classList.add("hidden"); }
 function handleRememberAuth(id, pw) {
   const isRemember = document.getElementById("sync-remember").checked;
-  if (isRemember) {
-    localStorage.setItem("syncAuth", JSON.stringify({ id: id, pw: pw }));
-  } else {
-    localStorage.removeItem("syncAuth");
-  }
+  if (isRemember) localStorage.setItem("syncAuth", JSON.stringify({ id: id, pw: pw }));
+  else localStorage.removeItem("syncAuth");
 }
-
 async function uploadData() {
   const id = document.getElementById("sync-id").value.trim();
   const pw = document.getElementById("sync-pw").value.trim();
-  
   if(!id || !pw) return alert("아이디와 비밀번호를 모두 입력해주세요.");
   if(!db) return alert("데이터베이스 연결 실패");
-
   handleRememberAuth(id, pw);
-
   try {
     const ref = db.collection("users").doc(id);
     const doc = await ref.get();
-
     if(doc.exists) {
-      if(doc.data().password !== pw) {
-        return alert("비밀번호가 틀렸습니다.\n(다른 사람이 사용 중인 아이디일 수 있습니다.)");
-      }
+      if(doc.data().password !== pw) return alert("비밀번호가 틀렸습니다.");
       if(!confirm("기존 데이터를 덮어쓰고 저장하시겠습니까?")) return;
     } else {
       if(!confirm(`'${id}' 계정을 새로 만들고 저장하시겠습니까?`)) return;
     }
-
     await ref.set({
-      password: pw,
-      updatedAt: new Date().toISOString(),
-      patterns: Array.from(memorizedPatterns),
-      words: Array.from(memorizedWords),
-      idioms: Array.from(memorizedIdioms),
-      settings: { 
-        voiceIndex: userVoiceIndex, 
-        rate: userRate, 
-        autoPlay: autoPlayEnabled,
-        fontSize: userFontSize,
-        wordLevel: selectedWordLevel,
-        idiomLevel: selectedIdiomLevel,
-        filterPattern: patternStudyingOnly,
-        filterWord: wordStudyingOnly,
-        filterIdiom: idiomStudyingOnly
-      }
+      password: pw, updatedAt: new Date().toISOString(),
+      patterns: Array.from(memorizedPatterns), words: Array.from(memorizedWords), idioms: Array.from(memorizedIdioms),
+      settings: { voiceIndex: userVoiceIndex, rate: userRate, autoPlay: autoPlayEnabled, fontSize: userFontSize, wordLevel: selectedWordLevel, idiomLevel: selectedIdiomLevel, filterPattern: patternStudyingOnly, filterWord: wordStudyingOnly, filterIdiom: idiomStudyingOnly }
     });
-
-    alert("✅ 학습내용이 안전하게 저장되었습니다.");
-    closeSyncModal();
-  } catch(e) {
-    console.error(e);
-    alert("오류 발생: " + e.message);
-  }
+    alert("✅ 학습내용이 안전하게 저장되었습니다."); closeSyncModal();
+  } catch(e) { console.error(e); alert("오류 발생: " + e.message); }
 }
-
 async function downloadData() {
   const id = document.getElementById("sync-id").value.trim();
   const pw = document.getElementById("sync-pw").value.trim();
-
   if(!id || !pw) return alert("아이디와 비밀번호를 입력해주세요.");
   if(!db) return alert("데이터베이스 연결 실패");
-
   handleRememberAuth(id, pw);
-
   try {
     const ref = db.collection("users").doc(id);
     const doc = await ref.get();
-
     if(!doc.exists) return alert("존재하지 않는 아이디입니다.");
     if(doc.data().password !== pw) return alert("비밀번호가 틀렸습니다.");
-
     if(!confirm("현재 기기의 학습 기록을 지우고,\n서버에 저장된 내용을 불러오시겠습니까?")) return;
-
     const d = doc.data();
-    
     if(d.patterns) memorizedPatterns = new Set(d.patterns);
     if(d.words) memorizedWords = new Set(d.words);
     if(d.idioms) memorizedIdioms = new Set(d.idioms);
-    
     if(d.settings) {
-      userVoiceIndex = d.settings.voiceIndex;
-      userRate = d.settings.rate || 1.0;
+      userVoiceIndex = d.settings.voiceIndex; userRate = d.settings.rate || 1.0;
       if(d.settings.autoPlay !== undefined) autoPlayEnabled = d.settings.autoPlay;
-      if(d.settings.fontSize) {
-        userFontSize = d.settings.fontSize;
-        applyFontSizeToBody(userFontSize);
-      }
+      if(d.settings.fontSize) { userFontSize = d.settings.fontSize; applyFontSizeToBody(userFontSize); }
       if(d.settings.wordLevel !== undefined) selectedWordLevel = d.settings.wordLevel;
       if(d.settings.idiomLevel !== undefined) selectedIdiomLevel = d.settings.idiomLevel;
       if(d.settings.filterPattern !== undefined) patternStudyingOnly = d.settings.filterPattern;
       if(d.settings.filterWord !== undefined) wordStudyingOnly = d.settings.filterWord;
       if(d.settings.filterIdiom !== undefined) idiomStudyingOnly = d.settings.filterIdiom;
     }
-    
-    // 로컬 스토리지 동기화
     localStorage.setItem("selectedWordLevel", selectedWordLevel);
     localStorage.setItem("selectedIdiomLevel", selectedIdiomLevel);
     localStorage.setItem("patternStudyingOnly", patternStudyingOnly);
     localStorage.setItem("wordStudyingOnly", wordStudyingOnly);
     localStorage.setItem("idiomStudyingOnly", idiomStudyingOnly);
-
-    saveDataLocally('pattern'); 
-    saveDataLocally('word'); 
-    saveDataLocally('idiom');
-    localStorage.setItem("ttsSettings", JSON.stringify({ 
-      voiceIndex: userVoiceIndex, 
-      rate: userRate, 
-      autoPlay: autoPlayEnabled,
-      fontSize: userFontSize
-    }));
-    
+    saveDataLocally('pattern'); saveDataLocally('word'); saveDataLocally('idiom');
+    localStorage.setItem("ttsSettings", JSON.stringify({ voiceIndex: userVoiceIndex, rate: userRate, autoPlay: autoPlayEnabled, fontSize: userFontSize }));
     updatePatternProgress(); updateWordProgress(); updateIdiomProgress();
-    
-    const currPage = history.state ? history.state.page : 'home';
+    const currPage = location.hash.replace('#', '') || 'home';
     if (currPage === 'patterns') renderPatternList();
     if (currPage === 'words') renderWordList();
     if (currPage === 'idioms') renderIdiomList();
-    
-    alert("✅ 학습내용을 성공적으로 불러왔습니다.");
-    closeSyncModal();
-  } catch(e) {
-    console.error(e);
-    alert("오류 발생: " + e.message);
-  }
-}
-
-function saveDataLocally(type) {
-  if (type === 'pattern') {
-    localStorage.setItem("patternMemorizedIds", JSON.stringify(Array.from(memorizedPatterns)));
-    updatePatternProgress();
-  }
-  if (type === 'word') {
-    localStorage.setItem("wordMemorizedIds", JSON.stringify(Array.from(memorizedWords)));
-    updateWordProgress();
-  }
-  if (type === 'idiom') {
-    localStorage.setItem("idiomMemorizedIds", JSON.stringify(Array.from(memorizedIdioms)));
-    updateIdiomProgress();
-  }
+    alert("✅ 학습내용을 성공적으로 불러왔습니다."); closeSyncModal();
+  } catch(e) { console.error(e); alert("오류 발생: " + e.message); }
 }
 
 // ==========================================
@@ -1197,126 +987,79 @@ document.body.addEventListener('click', function unlockTTS() {
 }, { once: true });
 
 // ==========================================
-// 14. PWA 설치 배너 로직
+// 14. PWA 설치 배너
 // ==========================================
 let deferredPrompt;
 const installBanner = document.getElementById('install-banner');
-
 window.addEventListener('beforeinstallprompt', (e) => {
-  console.log("✅ PWA 설치 이벤트 감지됨!"); 
-  e.preventDefault();
-  deferredPrompt = e;
-  
-  if (!localStorage.getItem('installBannerDismissed')) {
-    installBanner.classList.remove('hidden');
-  }
+  e.preventDefault(); deferredPrompt = e;
+  if (!localStorage.getItem('installBannerDismissed')) installBanner.classList.remove('hidden');
 });
-
 async function installPWA() {
-  if (!deferredPrompt) {
-    alert("브라우저 메뉴의 [홈 화면에 추가]나 [앱 설치]를 이용해주세요.");
-    return;
-  }
-  
+  if (!deferredPrompt) { alert("브라우저 메뉴의 [홈 화면에 추가]나 [앱 설치]를 이용해주세요."); return; }
   deferredPrompt.prompt();
   const { outcome } = await deferredPrompt.userChoice;
-  
-  deferredPrompt = null;
-  installBanner.classList.add('hidden');
+  deferredPrompt = null; installBanner.classList.add('hidden');
 }
-
-function hideInstallBanner() {
-  installBanner.classList.add('hidden');
-  localStorage.setItem('installBannerDismissed', 'true');
-}
-
-window.addEventListener('appinstalled', () => {
-  installBanner.classList.add('hidden');
-  deferredPrompt = null;
-});
+function hideInstallBanner() { installBanner.classList.add('hidden'); localStorage.setItem('installBannerDismissed', 'true'); }
+window.addEventListener('appinstalled', () => { installBanner.classList.add('hidden'); deferredPrompt = null; });
 
 // ==========================================
 // 15. 공유 기능
 // ==========================================
 const KAKAO_JS_KEY = 'YOUR_KAKAO_JS_KEY'; 
-
 if (typeof Kakao !== 'undefined' && KAKAO_JS_KEY !== 'YOUR_KAKAO_JS_KEY') {
-  try {
-    if (!Kakao.isInitialized()) {
-      Kakao.init(KAKAO_JS_KEY);
-    }
-  } catch(e) {
-    console.log("Kakao init failed", e);
-  }
+  try { if (!Kakao.isInitialized()) Kakao.init(KAKAO_JS_KEY); } catch(e) { console.log("Kakao init failed", e); }
 }
-
 function shareApp() {
   if (typeof Kakao !== 'undefined' && Kakao.isInitialized()) {
     try {
       Kakao.Share.sendDefault({
         objectType: 'feed',
         content: {
-          title: 'English & Go',
-          description: '오늘의 영어 정복을 시작해볼까요? 영어회화 공부 ENGO와 함께해요.',
-          imageUrl: window.location.origin + '/icon.png',
-          link: {
-            mobileWebUrl: window.location.href,
-            webUrl: window.location.href,
-          },
+          title: 'English & Go', description: '오늘의 영어 정복을 시작해볼까요? 영어회화 공부 ENGO와 함께해요.',
+          imageUrl: window.location.origin + '/icon.png', link: { mobileWebUrl: window.location.href, webUrl: window.location.href }
         },
-        buttons: [
-          {
-            title: '함께 공부하기',
-            link: {
-              mobileWebUrl: window.location.href,
-              webUrl: window.location.href,
-            },
-          },
-        ],
+        buttons: [ { title: '함께 공부하기', link: { mobileWebUrl: window.location.href, webUrl: window.location.href } } ]
       });
       return;
-    } catch(e) {
-      console.log("Kakao share failed, trying native share...");
-    }
+    } catch(e) { console.log("Kakao share failed..."); }
   }
-
   if (navigator.share) {
-    navigator.share({
-      title: 'English & Go',
-      text: '오늘의 영어 정복을 시작해볼까요? 영어회화 공부 ENGO와 함께해요.',
-      url: window.location.href,
-    }).catch(console.log);
-  } 
-  else {
-    const dummy = document.createElement('input');
-    document.body.appendChild(dummy);
-    dummy.value = window.location.href;
-    dummy.select();
-    document.execCommand('copy');
-    document.body.removeChild(dummy);
+    navigator.share({ title: 'English & Go', text: '오늘의 영어 정복을 시작해볼까요? 영어회화 공부 ENGO와 함께해요.', url: window.location.href }).catch(console.log);
+  } else {
+    const dummy = document.createElement('input'); document.body.appendChild(dummy); dummy.value = window.location.href;
+    dummy.select(); document.execCommand('copy'); document.body.removeChild(dummy);
     alert("링크가 복사되었습니다! 친구에게 붙여넣기 해보세요.");
   }
 }
 
 // ==========================================
-// 16. 실시간 영어 뉴스 로더 (수동 새로고침)
+// 16. 실시간 영어 뉴스 로더 (세션 스토리지 적용: 중요!)
 // ==========================================
 const NEWS_TOPICS = [
   "https://news.google.com/rss/search?q=South+Korea+(k-pop+OR+k-drama+OR+movie)+(popular+OR+success)&hl=en-US&gl=US&ceid=US:en",
   "https://news.google.com/rss/search?q=South+Korea+(technology+OR+samsung+OR+economy)+(growth+OR+innovation)&hl=en-US&gl=US&ceid=US:en",
   "https://news.google.com/rss/search?q=South+Korea+(food+OR+travel+OR+trend)+(viral+OR+famous)&hl=en-US&gl=US&ceid=US:en"
 ];
-
 let currentTopicIndex = 0; 
 
 function refreshNews() {
-  fetchRealNews();
+  fetchRealNews(true); // 강제 새로고침
 }
 
-async function fetchRealNews() {
+async function fetchRealNews(force = false) {
   const container = document.getElementById('news-card-list');
   if (!container) return;
 
+  // [핵심] 세션 스토리지에 뉴스가 이미 있고, 강제 새로고침이 아니면 그것을 씀 (API 호출 X)
+  const cachedNews = sessionStorage.getItem('cachedNewsHTML');
+  if (!force && cachedNews) {
+    container.innerHTML = cachedNews;
+    return;
+  }
+
+  // 로딩 표시
   container.innerHTML = `<div style="padding:30px; text-align:center; color:#94a3b8; font-size:0.9rem; width:100%;">
     🔄 Mixing fresh stories...<br><span style="font-size:0.8rem; opacity:0.7">Topic ${currentTopicIndex + 1} Loading</span>
   </div>`;
@@ -1329,8 +1072,7 @@ async function fetchRealNews() {
     const data = await response.json();
 
     if (data.status === 'ok') {
-      container.innerHTML = ""; 
-      
+      let htmlContent = ""; 
       let allArticles = data.items.slice(0, 15); 
       const shuffled = allArticles.sort(() => 0.5 - Math.random());
       const selectedArticles = shuffled.slice(0, 3);
@@ -1340,30 +1082,33 @@ async function fetchRealNews() {
         const sourceName = item.title.split(" - ")[1] || "News";
         const date = new Date(item.pubDate);
         const timeAgo = getTimeAgo(date);
-
-        const card = document.createElement('div');
-        card.className = 'news-card';
-        card.onclick = () => window.open(item.link, '_blank');
+        const link = item.link;
 
         let topicTag = "#Trending";
         if (currentTopicIndex === 0) topicTag = "#K-Culture";
         else if (currentTopicIndex === 1) topicTag = "#Tech&Biz";
         else if (currentTopicIndex === 2) topicTag = "#Lifestyle";
 
-        card.innerHTML = `
-          <div>
-            <span class="news-tag">${topicTag}</span>
-            <div class="news-title">${cleanTitle}</div>
-            <div class="news-summary" style="font-size:0.8rem; color:#94a3b8;">
-              ${item.description ? item.description.replace(/<[^>]*>?/gm, '').substring(0, 70) + "..." : "Click to read more."}
+        // onclick에 window.open 직접 주입
+        htmlContent += `
+          <div class="news-card" onclick="window.open('${link}', '_blank')">
+            <div>
+              <span class="news-tag">${topicTag}</span>
+              <div class="news-title">${cleanTitle}</div>
+              <div class="news-summary" style="font-size:0.8rem; color:#94a3b8;">
+                ${item.description ? item.description.replace(/<[^>]*>?/gm, '').substring(0, 70) + "..." : "Click to read more."}
+              </div>
+            </div>
+            <div class="news-footer">
+              <span>${sourceName}</span> • <span>${timeAgo}</span>
             </div>
           </div>
-          <div class="news-footer">
-            <span>${sourceName}</span> • <span>${timeAgo}</span>
-          </div>
         `;
-        container.appendChild(card);
       });
+
+      container.innerHTML = htmlContent;
+      // [핵심] 불러온 HTML을 세션 스토리지에 저장
+      sessionStorage.setItem('cachedNewsHTML', htmlContent);
 
       currentTopicIndex = (currentTopicIndex + 1) % NEWS_TOPICS.length;
 
@@ -1379,45 +1124,22 @@ async function fetchRealNews() {
 function loadBackupNews() {
   const container = document.getElementById('news-card-list');
   const newsData = [
-    { 
-      tag: "K-Culture", 
-      title: "Han Kang wins Nobel Prize in Literature", 
-      summary: "South Korean author Han Kang brings home the Nobel Prize, marking a historic moment for K-Literature.", 
-      source: "CNN", 
-      url: "https://edition.cnn.com/2024/10/10/style/han-kang-nobel-prize-literature-intl/index.html" 
-    },
-    { 
-      tag: "K-Food", 
-      title: "Frozen Kimbap becomes a massive hit in the US", 
-      summary: "Trader Joe's sold out of Korean frozen kimbap instantly, showing the global power of K-Food.", 
-      source: "NBC News", 
-      url: "https://www.nbcnews.com/news/asian-america/frozen-kimbap-korean-food-trader-joes-viral-tiktok-rcna101247" 
-    },
-    { 
-      tag: "Tech", 
-      title: "Korea to launch new space rocket next month", 
-      summary: "South Korea continues its journey into space with the upcoming launch of its homegrown Nuri rocket.", 
-      source: "Korea Herald", 
-      url: "http://www.koreaherald.com/" 
-    }
+    { tag: "K-Culture", title: "Han Kang wins Nobel Prize in Literature", summary: "South Korean author Han Kang brings home the Nobel Prize.", source: "CNN", url: "https://edition.cnn.com/" },
+    { tag: "K-Food", title: "Frozen Kimbap becomes a massive hit", summary: "Trader Joe's sold out of Korean frozen kimbap instantly.", source: "NBC", url: "https://www.nbcnews.com/" },
+    { tag: "Tech", title: "Korea to launch new space rocket", summary: "South Korea continues its journey into space.", source: "Korea Herald", url: "http://www.koreaherald.com/" }
   ];
   
-  container.innerHTML = "";
+  let htmlContent = "";
   newsData.forEach(news => {
-    const card = document.createElement('div');
-    card.className = 'news-card';
-    card.onclick = () => window.open(news.url, '_blank');
-    
-    card.innerHTML = `
-      <div>
-        <span class="news-tag">#${news.tag}</span>
-        <div class="news-title">${news.title}</div>
-        <div class="news-summary">${news.summary}</div>
+    htmlContent += `
+      <div class="news-card" onclick="window.open('${news.url}', '_blank')">
+        <div><span class="news-tag">#${news.tag}</span><div class="news-title">${news.title}</div><div class="news-summary">${news.summary}</div></div>
+        <div class="news-footer">Source: ${news.source}</div>
       </div>
-      <div class="news-footer">Source: ${news.source}</div>
     `;
-    container.appendChild(card);
   });
+  container.innerHTML = htmlContent;
+  sessionStorage.setItem('cachedNewsHTML', htmlContent);
 }
 
 function getTimeAgo(date) {
@@ -1429,26 +1151,19 @@ function getTimeAgo(date) {
   return "Just now";
 }
 
-// [핵심] 앱 초기화 함수
+// [핵심] 초기화 로직 (Start)
 function initApp() {
-  // 1. 데이터 로드
   loadMemorizedData();
   loadVoices();
-
-  // 2. 뉴스 로드 (단 1회)
-  // 이전 로직과 달리 여기서는 한 번만 부름. 뒤로 가기시 재호출 안함.
+  
+  // 뉴스: 처음 한 번만 부르고, 뒤로가기로 와도 저장된 거 씀
   fetchRealNews();
 
-  // 3. 초기 화면 설정 (무조건 1개 스택으로 고정)
-  // 'replace' 모드로 강제하여 이전의 모든 기록을 현재 'home'으로 덮어씌움
-  const initialPage = 'home'; // 무조건 홈부터 시작
-  
-  // 화면 그리기 (히스토리 조작 X)
-  switchPage(initialPage);
-  
-  // 현재 상태를 'home'으로 못박음 (Replace)
-  history.replaceState({ page: initialPage }, "", "#" + initialPage);
+  // [매우 중요] 앱 시작 시 히스토리 초기화 (1스택 고정)
+  // 현재 위치를 홈으로 간주하고 이전 기록 날림
+  const startPage = 'home';
+  renderPageOnly(startPage);
+  history.replaceState({ page: startPage }, "", "#" + startPage);
 }
 
-// 앱 시작
 initApp();
