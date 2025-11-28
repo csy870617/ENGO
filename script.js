@@ -38,6 +38,7 @@ let currentWordList = [];
 let currentIdiomList = [];
 let currentConvList = [];
 
+// 설정 변수 (저장 대상)
 let selectedWordLevel = 0;
 let memorizedWords = new Set();
 let wordStudyingOnly = false;
@@ -52,44 +53,41 @@ let patternStudyingOnly = false;
 let currentShadowingId = null;
 let shadowingLineIndex = 0;
 
-let isBackAction = false; 
+// ==========================================
+// 2. 네비게이션 (히스토리 꼬임 방지 로직)
+// ==========================================
 
-// ==========================================
-// 2. 네비게이션 (히스토리 API 최적화)
-// ==========================================
+// 2-1. [뒤로가기 감지] 사용자가 브라우저 뒤로가기를 눌렀을 때만 실행
 window.onpopstate = function(event) {
-  // 모달 닫기 우선 처리
+  // 열린 모달이 있으면 닫기만 하고 페이지 이동은 안 함
   const openModals = document.querySelectorAll('.modal:not(.hidden)');
   if (openModals.length > 0) {
     openModals.forEach(modal => modal.classList.add('hidden'));
-    // 모달 닫을 때는 페이지 이동 로직 중단 (히스토리 꼬임 방지)
     return;
   }
 
+  // 저장된 상태가 있으면 그 페이지로, 없으면 홈으로 렌더링 (기록 추가 X)
   const page = (event.state && event.state.page) ? event.state.page : 'home';
-  
-  isBackAction = true;
-  // 뒤로가기 시에는 화면만 변경 (기록 추가 X)
-  switchPage(page); 
-  isBackAction = false;
+  renderPageOnly(page);
 };
 
-// [핵심] 기록을 남기며 이동 (버튼 클릭 시)
+// 2-2. [메뉴 이동] 버튼 클릭 시 실행 (기록 추가 O)
 function goTo(page) {
   if ("speechSynthesis" in window) {
     window.speechSynthesis.cancel();
   }
 
-  // 현재 페이지와 같으면 이동 안 함
+  // 현재 페이지와 같으면 기록 쌓지 않음
   if (history.state && history.state.page === page) return;
 
-  // 기록 추가
+  // 새 기록 추가
   history.pushState({ page: page }, "", "#" + page);
-  switchPage(page);
+  renderPageOnly(page);
 }
 
-// [핵심] 화면만 변경하는 함수 (기록 조작 없음)
-function switchPage(page) {
+// 2-3. [화면 그리기] 순수하게 화면만 바꾸는 함수 (히스토리 조작 없음)
+function renderPageOnly(page) {
+  // 모든 페이지 숨기고 해당 페이지만 보임
   pages.forEach((p) => {
     const el = document.getElementById("page-" + p);
     if (!el) return;
@@ -97,7 +95,7 @@ function switchPage(page) {
     else el.classList.add("hidden");
   });
 
-  // 페이지별 렌더링
+  // 각 페이지별 데이터 렌더링
   if (page === "patterns") renderPatternList();
   if (page === "words") renderWordList();
   if (page === "idioms") renderIdiomList();
@@ -105,10 +103,28 @@ function switchPage(page) {
   if (page === "shadowing-list") renderShadowingList();
   if (page === "puzzle") initPuzzle();
 
-  // 홈으로 돌아왔는데 뉴스가 비어있으면 로드
+  // 홈 화면 진입 시 뉴스 로드 (최초 1회만 로딩)
   if (page === "home" && !hasLoadedNews) {
     fetchRealNews();
   }
+}
+
+// 2-4. [앱 초기화] 앱이 켜질 때 딱 한 번 실행
+function initApp() {
+  // 1. 데이터 로드
+  loadMemorizedData();
+  loadVoices();
+  
+  // 2. 현재 주소의 해시값 확인 (예: #words)
+  const hashPage = location.hash.replace('#', '');
+  const startPage = pages.includes(hashPage) ? hashPage : 'home';
+
+  // 3. [핵심] 현재 페이지를 강제로 교체(Replace)하여 기록을 1개로 고정함
+  // 이렇게 하면 이전에 쌓인 '로딩 기록'들이 덮어씌워져서 뒤로가기 시 바로 나가지게 됨
+  history.replaceState({ page: startPage }, "", "#" + startPage);
+  
+  // 4. 화면 그리기
+  renderPageOnly(startPage);
 }
 
 // ==========================================
@@ -118,27 +134,22 @@ function loadMemorizedData() {
   try {
     const pRaw = localStorage.getItem("patternMemorizedIds");
     if (pRaw) memorizedPatterns = new Set(JSON.parse(pRaw));
-
     const wRaw = localStorage.getItem("wordMemorizedIds");
     if (wRaw) memorizedWords = new Set(JSON.parse(wRaw));
-
     const iRaw = localStorage.getItem("idiomMemorizedIds");
     if (iRaw) memorizedIdioms = new Set(JSON.parse(iRaw));
 
-    const pStudyRaw = localStorage.getItem("patternStudyingOnly");
-    if (pStudyRaw !== null) patternStudyingOnly = (pStudyRaw === 'true');
+    const pStudy = localStorage.getItem("patternStudyingOnly");
+    if(pStudy !== null) patternStudyingOnly = (pStudy === 'true');
+    const wStudy = localStorage.getItem("wordStudyingOnly");
+    if(wStudy !== null) wordStudyingOnly = (wStudy === 'true');
+    const iStudy = localStorage.getItem("idiomStudyingOnly");
+    if(iStudy !== null) idiomStudyingOnly = (iStudy === 'true');
 
-    const wStudyRaw = localStorage.getItem("wordStudyingOnly");
-    if (wStudyRaw !== null) wordStudyingOnly = (wStudyRaw === 'true');
-
-    const iStudyRaw = localStorage.getItem("idiomStudyingOnly");
-    if (iStudyRaw !== null) idiomStudyingOnly = (iStudyRaw === 'true');
-
-    const wLevelRaw = localStorage.getItem("selectedWordLevel");
-    if (wLevelRaw !== null) selectedWordLevel = parseInt(wLevelRaw);
-
-    const iLevelRaw = localStorage.getItem("selectedIdiomLevel");
-    if (iLevelRaw !== null) selectedIdiomLevel = parseInt(iLevelRaw);
+    const wLevel = localStorage.getItem("selectedWordLevel");
+    if(wLevel !== null) selectedWordLevel = parseInt(wLevel);
+    const iLevel = localStorage.getItem("selectedIdiomLevel");
+    if(iLevel !== null) selectedIdiomLevel = parseInt(iLevel);
 
   } catch (e) { console.warn(e); }
 }
@@ -155,9 +166,7 @@ function renderPatternList() {
   if (!container || typeof patternData === "undefined") return;
 
   const filterBtn = document.getElementById("pattern-studying-btn");
-  if (filterBtn) {
-    filterBtn.classList.toggle("active", patternStudyingOnly);
-  }
+  if (filterBtn) filterBtn.classList.toggle("active", patternStudyingOnly);
 
   const keyword = (document.getElementById("pattern-search")?.value || "").toLowerCase();
   container.innerHTML = "";
@@ -275,9 +284,7 @@ function renderWordList() {
   if (!container || typeof wordData === "undefined") return;
   
   const filterBtn = document.getElementById("word-studying-btn");
-  if (filterBtn) {
-    filterBtn.classList.toggle("active", wordStudyingOnly);
-  }
+  if (filterBtn) filterBtn.classList.toggle("active", wordStudyingOnly);
 
   document.querySelectorAll("[data-word-level-btn]").forEach(b => {
     b.classList.toggle("active", parseInt(b.dataset.wordLevelBtn) === selectedWordLevel);
@@ -399,9 +406,7 @@ function renderIdiomList() {
   if (!container) return;
   
   const filterBtn = document.getElementById("idiom-studying-btn");
-  if (filterBtn) {
-    filterBtn.classList.toggle("active", idiomStudyingOnly);
-  }
+  if (filterBtn) filterBtn.classList.toggle("active", idiomStudyingOnly);
 
   document.querySelectorAll("[data-idiom-level-btn]").forEach(b => {
     b.classList.toggle("active", parseInt(b.dataset.idiomLevelBtn) === selectedIdiomLevel);
@@ -579,33 +584,6 @@ function startShadowingFromConv(id) {
   updateShadowingOptionsUI();
   updateShadowingUI();
 }
-
-function moveItemInList(currentId, list, offset, openFunc) {
-  if (!list || list.length === 0) {
-    alert("목록이 비어있습니다.");
-    return;
-  }
-  
-  const idx = list.findIndex(item => item.id === currentId);
-  
-  if (idx === -1) {
-    openFunc(list[0].id);
-    return;
-  }
-  
-  const nextIdx = idx + offset;
-  if (nextIdx >= 0 && nextIdx < list.length) {
-    openFunc(list[nextIdx].id);
-  } else {
-    alert(offset > 0 ? "마지막 항목입니다." : "첫 번째 항목입니다.");
-  }
-}
-
-function movePattern(o) { moveItemInList(currentPatternId, currentPatternList, o, openPattern); }
-function moveWord(o) { moveItemInList(currentWordId, currentWordList, o, openWord); }
-function moveIdiom(o) { moveItemInList(currentIdiomId, currentIdiomList, o, openIdiom); }
-function moveConv(o) { moveItemInList(currentConvId, currentConvList, o, openConversation); }
-
 
 // ==========================================
 // 8. 쉐도잉 (Shadowing)
@@ -1209,7 +1187,109 @@ document.body.addEventListener('click', function unlockTTS() {
 }, { once: true });
 
 // ==========================================
-// 16. 실시간 영어 뉴스 로더
+// 14. PWA 설치 배너 로직
+// ==========================================
+let deferredPrompt;
+const installBanner = document.getElementById('install-banner');
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  console.log("✅ PWA 설치 이벤트 감지됨!"); 
+  e.preventDefault();
+  deferredPrompt = e;
+  
+  if (!localStorage.getItem('installBannerDismissed')) {
+    installBanner.classList.remove('hidden');
+  }
+});
+
+async function installPWA() {
+  if (!deferredPrompt) {
+    alert("브라우저 메뉴의 [홈 화면에 추가]나 [앱 설치]를 이용해주세요.");
+    return;
+  }
+  
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  
+  deferredPrompt = null;
+  installBanner.classList.add('hidden');
+}
+
+function hideInstallBanner() {
+  installBanner.classList.add('hidden');
+  localStorage.setItem('installBannerDismissed', 'true');
+}
+
+window.addEventListener('appinstalled', () => {
+  installBanner.classList.add('hidden');
+  deferredPrompt = null;
+});
+
+// ==========================================
+// 15. 공유 기능
+// ==========================================
+const KAKAO_JS_KEY = 'YOUR_KAKAO_JS_KEY'; 
+
+if (typeof Kakao !== 'undefined' && KAKAO_JS_KEY !== 'YOUR_KAKAO_JS_KEY') {
+  try {
+    if (!Kakao.isInitialized()) {
+      Kakao.init(KAKAO_JS_KEY);
+    }
+  } catch(e) {
+    console.log("Kakao init failed", e);
+  }
+}
+
+function shareApp() {
+  if (typeof Kakao !== 'undefined' && Kakao.isInitialized()) {
+    try {
+      Kakao.Share.sendDefault({
+        objectType: 'feed',
+        content: {
+          title: 'English & Go',
+          description: '오늘의 영어 정복을 시작해볼까요? 영어회화 공부 ENGO와 함께해요.',
+          imageUrl: window.location.origin + '/icon.png',
+          link: {
+            mobileWebUrl: window.location.href,
+            webUrl: window.location.href,
+          },
+        },
+        buttons: [
+          {
+            title: '함께 공부하기',
+            link: {
+              mobileWebUrl: window.location.href,
+              webUrl: window.location.href,
+            },
+          },
+        ],
+      });
+      return;
+    } catch(e) {
+      console.log("Kakao share failed, trying native share...");
+    }
+  }
+
+  if (navigator.share) {
+    navigator.share({
+      title: 'English & Go',
+      text: '오늘의 영어 정복을 시작해볼까요? 영어회화 공부 ENGO와 함께해요.',
+      url: window.location.href,
+    }).catch(console.log);
+  } 
+  else {
+    const dummy = document.createElement('input');
+    document.body.appendChild(dummy);
+    dummy.value = window.location.href;
+    dummy.select();
+    document.execCommand('copy');
+    document.body.removeChild(dummy);
+    alert("링크가 복사되었습니다! 친구에게 붙여넣기 해보세요.");
+  }
+}
+
+// ==========================================
+// 16. 실시간 영어 뉴스 로더 (수동 새로고침)
 // ==========================================
 const NEWS_TOPICS = [
   "https://news.google.com/rss/search?q=South+Korea+(k-pop+OR+k-drama+OR+movie)+(popular+OR+success)&hl=en-US&gl=US&ceid=US:en",
@@ -1218,7 +1298,8 @@ const NEWS_TOPICS = [
 ];
 
 let currentTopicIndex = 0; 
-let hasLoadedNews = false;
+// [신규] 뉴스 로드 여부 체크용 변수
+let hasLoadedNews = false; 
 
 function refreshNews() {
   fetchRealNews();
@@ -1242,7 +1323,7 @@ async function fetchRealNews() {
     if (data.status === 'ok') {
       container.innerHTML = ""; 
       
-      hasLoadedNews = true; // 로드 성공 플래그
+      hasLoadedNews = true; // 로드 성공 표시
 
       let allArticles = data.items.slice(0, 15); 
       const shuffled = allArticles.sort(() => 0.5 - Math.random());
@@ -1342,13 +1423,22 @@ function getTimeAgo(date) {
   return "Just now";
 }
 
-// 1. 로컬 데이터 로드
-loadMemorizedData();
-// 2. TTS 초기화
-loadVoices();
+// [핵심] 앱 초기화 함수
+function initApp() {
+  // 1. 데이터 로드
+  loadMemorizedData();
+  loadVoices();
 
-// 3. 초기 화면 렌더링 (중복 히스토리 방지: 강력한 replace)
-// [핵심] 앱 실행 시 무조건 히스토리 1개만 남김
-const initialPage = location.hash.replace('#', '') || 'home';
-switchPage(initialPage); 
-history.replaceState({ page: initialPage }, "", "#" + initialPage);
+  // 2. 초기 화면 설정 (무조건 1개 스택으로 고정)
+  // 'replace' 모드로 강제하여 이전의 모든 기록을 현재 'home'으로 덮어씌움
+  const initialPage = 'home'; // 무조건 홈부터 시작
+  
+  // 화면 그리기 (히스토리 조작 X)
+  switchPage(initialPage);
+  
+  // 현재 상태를 'home'으로 못박음 (Replace)
+  history.replaceState({ page: initialPage }, "", "#" + initialPage);
+}
+
+// 앱 시작
+initApp();
