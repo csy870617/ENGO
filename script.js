@@ -87,6 +87,7 @@ function goTo(page) {
     else el.classList.add("hidden");
   });
 
+  // 목록 화면으로 돌아올 때만 리스트를 갱신합니다.
   if (page === "patterns") renderPatternList();
   if (page === "words") renderWordList();
   if (page === "idioms") renderIdiomList();
@@ -129,7 +130,6 @@ function renderPatternList() {
   const keyword = (document.getElementById("pattern-search")?.value || "").toLowerCase();
   container.innerHTML = "";
 
-  // [중요] 현재 필터링된 리스트를 전역 변수에 저장 (네비게이션용)
   const filtered = patternData.filter((p) => {
     const matchText = (p.title + p.desc).toLowerCase().includes(keyword);
     const matchStudy = !patternStudyingOnly || !memorizedPatterns.has(p.id);
@@ -156,13 +156,16 @@ function renderPatternList() {
       if (check.checked) memorizedPatterns.add(p.id);
       else memorizedPatterns.delete(p.id);
       saveData('pattern');
-      if (patternStudyingOnly) renderPatternList();
+      // 목록에서는 즉시 반영을 위해 재렌더링
+      if (patternStudyingOnly) renderPatternList(); 
+      else updatePatternProgress(); // 전체 보기일 때는 UI만 갱신 (선택적)
     };
 
     div.appendChild(left);
     div.appendChild(check);
     container.appendChild(div);
   });
+  
   if (filtered.length === 0) container.innerHTML = '<div class="list-item"><div>검색 결과가 없습니다.</div></div>';
   updatePatternProgress();
 }
@@ -225,10 +228,12 @@ function togglePatternMemorizedDetail() {
   const chk = document.getElementById("pattern-memorized-checkbox");
   if (chk.checked) memorizedPatterns.add(currentPatternId);
   else memorizedPatterns.delete(currentPatternId);
+  
   saveData('pattern');
   
-  // [수정됨] 상세 화면에서는 리스트를 다시 그리지 않음 (네비게이션 순서 유지)
-  // renderPatternList();  <-- 삭제
+  // [수정됨] 상세 화면에서는 절대 리스트를 재렌더링하지 않습니다.
+  // 이렇게 해야 '다음/이전' 버튼이 현재 리스트(currentPatternList)를 기준으로 정상 작동합니다.
+  updatePatternProgress(); 
 }
 
 function playPatternExamples() {
@@ -245,7 +250,6 @@ function renderWordList() {
   const keyword = (document.getElementById("word-search")?.value || "").toLowerCase();
   container.innerHTML = "";
   
-  // [중요] 현재 필터링된 리스트를 전역 변수에 저장
   const filtered = wordData.filter(w => {
     const matchText = (w.word + w.meaning).toLowerCase().includes(keyword);
     const level = parseInt(w.id.match(/^L(\d)-/)?.[1] || 0);
@@ -344,8 +348,8 @@ function toggleWordMemorizedDetail() {
   if (chk.checked) memorizedWords.add(currentWordId); else memorizedWords.delete(currentWordId);
   saveData('word');
   
-  // [수정됨] 상세 화면에서는 리스트를 갱신하지 않음
-  // renderWordList(); <-- 삭제
+  // [수정됨] 리스트 갱신 제거
+  updateWordProgress();
 }
 
 function playWordExamples() {
@@ -362,7 +366,6 @@ function renderIdiomList() {
   const keyword = (document.getElementById("idiom-search")?.value || "").toLowerCase();
   container.innerHTML = "";
   
-  // [중요] 현재 필터링된 리스트를 전역 변수에 저장
   const filtered = idiomData.filter(i => {
     const matchText = (i.idiom + i.meaning).toLowerCase().includes(keyword);
     const matchLevel = selectedIdiomLevel === 0 || i.level === selectedIdiomLevel;
@@ -457,8 +460,8 @@ function toggleIdiomMemorizedDetail() {
   if (chk.checked) memorizedIdioms.add(currentIdiomId); else memorizedIdioms.delete(currentIdiomId);
   saveData('idiom');
   
-  // [수정됨] 상세 화면에서는 리스트를 갱신하지 않음
-  // renderIdiomList(); <-- 삭제
+  // [수정됨] 리스트 갱신 제거
+  updateIdiomProgress();
 }
 
 function playIdiomExamples() {
@@ -535,21 +538,30 @@ function startShadowingFromConv(id) {
   updateShadowingUI();
 }
 
+// [수정됨] 이동 로직 안전장치 강화
 function moveItemInList(currentId, list, offset, openFunc) {
-  if (!list || list.length === 0) return;
+  if (!list || list.length === 0) {
+    alert("목록이 비어있습니다.");
+    return;
+  }
+  
   const idx = list.findIndex(item => item.id === currentId);
   
-  // [수정됨] 현재 항목이 리스트에 없으면(필터링으로 인해) 아무것도 안 하거나 경고
-  // 하지만 상세 화면에서 체크를 바꿔도 list 변수 자체는 변경되지 않았으므로 idx를 찾을 수 있어야 정상.
   if (idx === -1) {
-     // 만약 정말 못 찾으면 첫 번째나 마지막으로 이동하는 대신, 그냥 알림
-     alert("목록에서 항목을 찾을 수 없습니다.");
-     return;
+    // 만약 필터링으로 인해 현재 항목이 리스트에서 사라진 경우라도,
+    // 원래 순서를 유지하기 위해 전체 데이터에서 찾는 등의 처리가 필요할 수 있지만,
+    // 현재 로직에서는 리스트 갱신을 막았으므로 이 경우는 거의 발생하지 않아야 합니다.
+    // 혹시 발생한다면 첫 번째 항목으로 이동하도록 처리
+    openFunc(list[0].id);
+    return;
   }
   
   const nextIdx = idx + offset;
-  if (nextIdx >= 0 && nextIdx < list.length) openFunc(list[nextIdx].id);
-  else alert(offset > 0 ? "마지막 항목입니다." : "첫 번째 항목입니다.");
+  if (nextIdx >= 0 && nextIdx < list.length) {
+    openFunc(list[nextIdx].id);
+  } else {
+    alert(offset > 0 ? "마지막 항목입니다." : "첫 번째 항목입니다.");
+  }
 }
 
 function movePattern(o) { moveItemInList(currentPatternId, currentPatternList, o, openPattern); }
@@ -808,12 +820,11 @@ function resetPuzzle() {
   updatePuzzleBoard();
 }
 
-// [신규] 퍼즐 정답 보기 함수
 function showPuzzleAnswer() {
   const fb = document.getElementById("puzzle-feedback");
   fb.textContent = `정답: ${currentPuzzleAnswer}`;
   fb.className = "feedback-msg";
-  fb.style.color = "#38bdf8"; // 정답 표시 색상
+  fb.style.color = "#38bdf8";
 }
 
 function movePuzzle(offset) {
@@ -1251,22 +1262,16 @@ function shareApp() {
 }
 
 // ==========================================
-// 16. [수정됨] 실시간 영어 뉴스 로더 (API 연동)
+// 16. 실시간 영어 뉴스 로더 (API 연동)
 // ==========================================
-
-// [수정됨] 3가지 다른 주제의 RSS 피드 URL (3시간마다 순환용)
 const NEWS_TOPICS = [
-  // Topic 1: K-Culture (K-pop, Drama, Movie)
   "https://news.google.com/rss/search?q=South+Korea+(k-pop+OR+k-drama+OR+movie)+(popular+OR+success)&hl=en-US&gl=US&ceid=US:en",
-  // Topic 2: Technology & Economy (Samsung, Tech, Business)
   "https://news.google.com/rss/search?q=South+Korea+(technology+OR+samsung+OR+economy)+(growth+OR+innovation)&hl=en-US&gl=US&ceid=US:en",
-  // Topic 3: Lifestyle & Society (Food, Travel, Trend)
   "https://news.google.com/rss/search?q=South+Korea+(food+OR+travel+OR+trend)+(viral+OR+famous)&hl=en-US&gl=US&ceid=US:en"
 ];
 
-let currentTopicIndex = 0; // 현재 주제 인덱스 (0, 1, 2 순환)
+let currentTopicIndex = 0; 
 
-// API 호출 함수
 async function fetchRealNews() {
   const container = document.getElementById('news-card-list');
   const badge = document.querySelector('.update-badge');
@@ -1274,7 +1279,6 @@ async function fetchRealNews() {
 
   container.innerHTML = `<div style="padding:20px; color:#aaa; font-size:0.9rem;">🔄 Loading fresh news...</div>`;
 
-  // 현재 순서의 RSS URL 선택
   const currentRssUrl = NEWS_TOPICS[currentTopicIndex];
   const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(currentRssUrl)}`;
 
@@ -1283,9 +1287,8 @@ async function fetchRealNews() {
     const data = await response.json();
 
     if (data.status === 'ok') {
-      container.innerHTML = ""; // 초기화
+      container.innerHTML = ""; 
       
-      // 최신 기사 3개만 가져오기
       const articles = data.items.slice(0, 3);
 
       articles.forEach(item => {
@@ -1315,7 +1318,6 @@ async function fetchRealNews() {
 
       if(badge) badge.textContent = "Freshly Updated";
 
-      // 다음 호출을 위해 인덱스 변경 (0 -> 1 -> 2 -> 0)
       currentTopicIndex = (currentTopicIndex + 1) % NEWS_TOPICS.length;
 
     } else {
@@ -1380,11 +1382,9 @@ function getTimeAgo(date) {
   return "Just now";
 }
 
-// 뉴스 자동 갱신 시스템 (3시간마다 주제 변경)
 function initNewsUpdater() {
-  fetchRealNews(); // 최초 실행
+  fetchRealNews(); 
 
-  // 3시간(10800000ms)마다 갱신 및 주제 변경
   setInterval(() => {
     fetchRealNews();
     console.log("📰 News topic rotated and updated.");
