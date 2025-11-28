@@ -52,45 +52,41 @@ let patternStudyingOnly = false;
 let currentShadowingId = null;
 let shadowingLineIndex = 0;
 
-let isBackAction = false; 
+// ==========================================
+// 2. 네비게이션 (로직 분리: 화면전환 vs 기록저장)
+// ==========================================
 
-// ==========================================
-// 2. 네비게이션 (히스토리 API 최적화 - 중복 방지)
-// ==========================================
+// [핵심] 브라우저 뒤로 가기 버튼을 눌렀을 때 실행됨
 window.onpopstate = function(event) {
+  // 열린 모달 닫기
   const openModals = document.querySelectorAll('.modal:not(.hidden)');
   if (openModals.length > 0) {
     openModals.forEach(modal => modal.classList.add('hidden'));
+    return;
   }
 
-  // 히스토리 상태가 없으면 홈으로 간주
+  // 히스토리 상태에 따라 화면만 변경 (기록 추가 X)
   const page = (event.state && event.state.page) ? event.state.page : 'home';
-  
-  isBackAction = true;
-  goTo(page, 'none'); // 뒤로가기 시에는 기록을 추가하지 않음
-  isBackAction = false;
+  switchPage(page);
 };
 
-// [수정됨] 페이지 이동 함수 (히스토리 가드 추가)
-function goTo(page, mode = 'push') {
+// [핵심] 사용자가 버튼을 눌러 이동할 때 (기록 추가 O)
+function goTo(page) {
+  // 현재 페이지와 같으면 이동하지 않음 (중복 쌓임 방지)
+  if (history.state && history.state.page === page) return;
+
+  // 새 기록 추가
+  history.pushState({ page: page }, "", "#" + page);
+  switchPage(page);
+}
+
+// [핵심] 순수하게 화면만 바꿔주는 함수 (히스토리 조작 없음)
+function switchPage(page) {
   if ("speechSynthesis" in window) {
     window.speechSynthesis.cancel();
   }
 
-  // 현재 페이지와 이동할 페이지가 같으면 히스토리 작업을 하지 않음 (중복 방지)
-  if (!isBackAction && history.state && history.state.page === page && mode === 'push') {
-    mode = 'none'; 
-  }
-
-  if (!isBackAction) {
-    if (mode === 'replace') {
-      history.replaceState({ page: page }, "", "#" + page);
-    } else if (mode === 'push') {
-      history.pushState({ page: page }, "", "#" + page);
-    }
-    // mode === 'none'이면 아무것도 안 함
-  }
-
+  // 모든 페이지 숨기고 해당 페이지만 보임
   pages.forEach((p) => {
     const el = document.getElementById("page-" + p);
     if (!el) return;
@@ -98,19 +94,17 @@ function goTo(page, mode = 'push') {
     else el.classList.add("hidden");
   });
 
-  // 페이지별 초기화 로직
+  // 페이지별 데이터 렌더링
   if (page === "patterns") renderPatternList();
   if (page === "words") renderWordList();
   if (page === "idioms") renderIdiomList();
   if (page === "conversations") renderConversationList();
   if (page === "shadowing-list") renderShadowingList();
   if (page === "puzzle") initPuzzle();
-  
-  // [신규] 홈 화면일 때만 뉴스 로드 (이미 로드된 데이터가 있으면 재사용)
-  if (page === "home") {
-    if (!hasLoadedNews) {
-      fetchRealNews();
-    }
+
+  // 홈 화면이고 뉴스가 아직 없으면 로드
+  if (page === "home" && !hasLoadedNews) {
+    fetchRealNews();
   }
 }
 
@@ -1212,6 +1206,108 @@ document.body.addEventListener('click', function unlockTTS() {
 }, { once: true });
 
 // ==========================================
+// 14. PWA 설치 배너 로직
+// ==========================================
+let deferredPrompt;
+const installBanner = document.getElementById('install-banner');
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  console.log("✅ PWA 설치 이벤트 감지됨!"); 
+  e.preventDefault();
+  deferredPrompt = e;
+  
+  if (!localStorage.getItem('installBannerDismissed')) {
+    installBanner.classList.remove('hidden');
+  }
+});
+
+async function installPWA() {
+  if (!deferredPrompt) {
+    alert("브라우저 메뉴의 [홈 화면에 추가]나 [앱 설치]를 이용해주세요.");
+    return;
+  }
+  
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  
+  deferredPrompt = null;
+  installBanner.classList.add('hidden');
+}
+
+function hideInstallBanner() {
+  installBanner.classList.add('hidden');
+  localStorage.setItem('installBannerDismissed', 'true');
+}
+
+window.addEventListener('appinstalled', () => {
+  installBanner.classList.add('hidden');
+  deferredPrompt = null;
+});
+
+// ==========================================
+// 15. 공유 기능
+// ==========================================
+const KAKAO_JS_KEY = 'YOUR_KAKAO_JS_KEY'; 
+
+if (typeof Kakao !== 'undefined' && KAKAO_JS_KEY !== 'YOUR_KAKAO_JS_KEY') {
+  try {
+    if (!Kakao.isInitialized()) {
+      Kakao.init(KAKAO_JS_KEY);
+    }
+  } catch(e) {
+    console.log("Kakao init failed", e);
+  }
+}
+
+function shareApp() {
+  if (typeof Kakao !== 'undefined' && Kakao.isInitialized()) {
+    try {
+      Kakao.Share.sendDefault({
+        objectType: 'feed',
+        content: {
+          title: 'English & Go',
+          description: '오늘의 영어 정복을 시작해볼까요? 영어회화 공부 ENGO와 함께해요.',
+          imageUrl: window.location.origin + '/icon.png',
+          link: {
+            mobileWebUrl: window.location.href,
+            webUrl: window.location.href,
+          },
+        },
+        buttons: [
+          {
+            title: '함께 공부하기',
+            link: {
+              mobileWebUrl: window.location.href,
+              webUrl: window.location.href,
+            },
+          },
+        ],
+      });
+      return;
+    } catch(e) {
+      console.log("Kakao share failed, trying native share...");
+    }
+  }
+
+  if (navigator.share) {
+    navigator.share({
+      title: 'English & Go',
+      text: '오늘의 영어 정복을 시작해볼까요? 영어회화 공부 ENGO와 함께해요.',
+      url: window.location.href,
+    }).catch(console.log);
+  } 
+  else {
+    const dummy = document.createElement('input');
+    document.body.appendChild(dummy);
+    dummy.value = window.location.href;
+    dummy.select();
+    document.execCommand('copy');
+    document.body.removeChild(dummy);
+    alert("링크가 복사되었습니다! 친구에게 붙여넣기 해보세요.");
+  }
+}
+
+// ==========================================
 // 16. 실시간 영어 뉴스 로더 (수동 새로고침)
 // ==========================================
 const NEWS_TOPICS = [
@@ -1221,8 +1317,7 @@ const NEWS_TOPICS = [
 ];
 
 let currentTopicIndex = 0; 
-// [신규] 뉴스 로드 여부 체크용 변수
-let hasLoadedNews = false; 
+let hasLoadedNews = false; // 뉴스 로드 여부 체크 변수
 
 function refreshNews() {
   fetchRealNews();
@@ -1246,9 +1341,8 @@ async function fetchRealNews() {
     if (data.status === 'ok') {
       container.innerHTML = ""; 
       
-      // 뉴스 로드 성공 표시 (자동 갱신 방지용)
-      hasLoadedNews = true;
-      
+      hasLoadedNews = true; // 로드 성공 표시
+
       let allArticles = data.items.slice(0, 15); 
       const shuffled = allArticles.sort(() => 0.5 - Math.random());
       const selectedArticles = shuffled.slice(0, 3);
@@ -1347,14 +1441,13 @@ function getTimeAgo(date) {
   return "Just now";
 }
 
-// [수정됨] 뉴스 자동 초기화 제거 -> goTo 함수에서 호출함
-
 // 1. 로컬 데이터 로드
 loadMemorizedData();
 // 2. TTS 초기화
 loadVoices();
 
 // 3. 초기 화면 렌더링 (중복 히스토리 방지: replace)
+// [중요] 앱 초기화 시에는 히스토리를 '교체'하여 뒤로 가기 스택이 1개(홈)만 남도록 함
 const initialPage = location.hash.replace('#', '') || 'home';
-// [중요] 처음 로드 시에는 replace 모드로 이동
-goTo(initialPage, 'replace');
+switchPage(initialPage); // 화면만 그림
+history.replaceState({ page: initialPage }, "", "#" + initialPage); // 기록 덮어씌움
