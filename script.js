@@ -75,7 +75,6 @@ window.onpopstate = function(event) {
 };
 
 function goTo(page, isReplace = false) {
-  // [핵심] 페이지 이동 시 오디오 무조건 중지
   if ("speechSynthesis" in window) {
     window.speechSynthesis.cancel();
   }
@@ -110,7 +109,6 @@ function goTo(page, isReplace = false) {
 // ==========================================
 function loadMemorizedData() {
   try {
-    // 암기 데이터 로드
     const pRaw = localStorage.getItem("patternMemorizedIds");
     if (pRaw) memorizedPatterns = new Set(JSON.parse(pRaw));
 
@@ -120,7 +118,6 @@ function loadMemorizedData() {
     const iRaw = localStorage.getItem("idiomMemorizedIds");
     if (iRaw) memorizedIdioms = new Set(JSON.parse(iRaw));
 
-    // 필터 상태 로드
     const pStudyRaw = localStorage.getItem("patternStudyingOnly");
     if (pStudyRaw !== null) patternStudyingOnly = (pStudyRaw === 'true');
 
@@ -130,7 +127,6 @@ function loadMemorizedData() {
     const iStudyRaw = localStorage.getItem("idiomStudyingOnly");
     if (iStudyRaw !== null) idiomStudyingOnly = (iStudyRaw === 'true');
 
-    // 레벨 상태 로드
     const wLevelRaw = localStorage.getItem("selectedWordLevel");
     if (wLevelRaw !== null) selectedWordLevel = parseInt(wLevelRaw);
 
@@ -265,7 +261,7 @@ function playPatternExamples() {
 }
 
 // ==========================================
-// 5. 단어 (Words) 로직
+// 5. 단어 (Words) 로직 (원상복구: 예문 표시)
 // ==========================================
 function renderWordList() {
   const container = document.getElementById("word-list");
@@ -299,6 +295,7 @@ function renderWordList() {
     if (memorizedWords.has(w.id)) div.classList.add("memorized");
     div.onclick = () => openWord(w.id);
     
+    // 단어 - 뜻 / 예문 표시 (원래대로)
     div.innerHTML = `<div><div class="list-item-title">${w.word} - ${w.meaning}</div><div class="list-item-sub">${w.examples?.[0]?.kr || ""}</div></div>`;
     
     const check = document.createElement("input");
@@ -1093,7 +1090,6 @@ async function uploadData() {
         rate: userRate, 
         autoPlay: autoPlayEnabled,
         fontSize: userFontSize,
-        // [중요] 레벨 및 필터 상태 저장
         wordLevel: selectedWordLevel,
         idiomLevel: selectedIdiomLevel,
         filterPattern: patternStudyingOnly,
@@ -1142,7 +1138,6 @@ async function downloadData() {
         userFontSize = d.settings.fontSize;
         applyFontSizeToBody(userFontSize);
       }
-      // [중요] 레벨 및 필터 상태 복원
       if(d.settings.wordLevel !== undefined) selectedWordLevel = d.settings.wordLevel;
       if(d.settings.idiomLevel !== undefined) selectedIdiomLevel = d.settings.idiomLevel;
       if(d.settings.filterPattern !== undefined) patternStudyingOnly = d.settings.filterPattern;
@@ -1150,7 +1145,6 @@ async function downloadData() {
       if(d.settings.filterIdiom !== undefined) idiomStudyingOnly = d.settings.filterIdiom;
     }
     
-    // 로컬 스토리지 동기화
     localStorage.setItem("selectedWordLevel", selectedWordLevel);
     localStorage.setItem("selectedIdiomLevel", selectedIdiomLevel);
     localStorage.setItem("patternStudyingOnly", patternStudyingOnly);
@@ -1169,7 +1163,6 @@ async function downloadData() {
     
     updatePatternProgress(); updateWordProgress(); updateIdiomProgress();
     
-    // 현재 페이지 리렌더링
     const currPage = history.state ? history.state.page : 'home';
     if (currPage === 'patterns') renderPatternList();
     if (currPage === 'words') renderWordList();
@@ -1209,6 +1202,10 @@ document.body.addEventListener('click', function unlockTTS() {
   }
   document.body.removeEventListener('click', unlockTTS);
 }, { once: true });
+
+// ==========================================
+// 13. 페이지 종료 전 저장 유도 (제거됨)
+// ==========================================
 
 // ==========================================
 // 14. PWA 설치 배너 로직
@@ -1313,7 +1310,7 @@ function shareApp() {
 }
 
 // ==========================================
-// 16. 실시간 영어 뉴스 로더 (수동 새로고침)
+// 16. 실시간 영어 뉴스 로더 (수동 새로고침 + 랜덤 셔플)
 // ==========================================
 const NEWS_TOPICS = [
   "https://news.google.com/rss/search?q=South+Korea+(k-pop+OR+k-drama+OR+movie)+(popular+OR+success)&hl=en-US&gl=US&ceid=US:en",
@@ -1447,14 +1444,65 @@ function initNewsUpdater() {
   fetchRealNews(); 
 }
 
-// 1. 로컬 데이터 로드
+// 17. [신규] 문의하기 기능 (EmailJS로 직접 전송)
+function openContactModal() {
+  document.getElementById('settings-modal').classList.add('hidden');
+  document.getElementById('contact-modal').classList.remove('hidden');
+}
+
+function closeContactModal() {
+  document.getElementById('contact-modal').classList.add('hidden');
+}
+
+function sendInquiry() {
+  const msgInput = document.getElementById('contact-msg');
+  const msg = msgInput.value;
+  
+  if (!msg.trim()) {
+    alert("내용을 입력해주세요.");
+    return;
+  }
+
+  const sendBtn = document.querySelector('#contact-modal .btn-main');
+  const originalText = sendBtn.innerText;
+  sendBtn.innerText = "전송 중...";
+  sendBtn.disabled = true;
+
+  const templateParams = {
+    message: msg, 
+    to_name: "Admin"
+  };
+
+  // ⚠️ YOUR_SERVICE_ID, YOUR_TEMPLATE_ID 부분 수정 필요
+  if (typeof emailjs !== 'undefined') {
+    emailjs.send('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', templateParams)
+      .then(function(response) {
+         console.log('SUCCESS!', response.status, response.text);
+         alert("✅ 소중한 의견이 전송되었습니다!");
+         msgInput.value = ""; 
+         closeContactModal();
+      }, function(error) {
+         console.log('FAILED...', error);
+         alert("전송 실패: EmailJS 설정을 확인해주세요.\n" + JSON.stringify(error));
+      })
+      .finally(function() {
+         sendBtn.innerText = originalText;
+         sendBtn.disabled = false;
+      });
+  } else {
+    alert("EmailJS 라이브러리가 로드되지 않았습니다.");
+    sendBtn.innerText = originalText;
+    sendBtn.disabled = false;
+  }
+}
+
+// ------------------------------------------
+// 초기화 실행
+// ------------------------------------------
 loadMemorizedData();
-// 2. TTS 초기화
 loadVoices();
-// 3. 뉴스 초기화
 initNewsUpdater(); 
 
-// 4. 초기 화면 렌더링 (중복 히스토리 방지)
+// 초기 화면 렌더링 (중복 히스토리 방지)
 const initialPage = location.hash.replace('#', '') || 'home';
-// 처음 로드 시에는 replace 모드로 이동
 goTo(initialPage, true);
