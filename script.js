@@ -53,7 +53,7 @@ let currentShadowingId = null;
 let shadowingLineIndex = 0;
 
 let isBackAction = false; 
-let isConversationPlaying = false; // [신규] 대화 연속 재생 상태 플래그
+let isConversationPlaying = false;
 
 // ==========================================
 // 2. 네비게이션 (히스토리 API 적용)
@@ -67,7 +67,7 @@ window.onpopstate = function(event) {
   if ("speechSynthesis" in window) {
     window.speechSynthesis.cancel();
   }
-  isConversationPlaying = false; // 뒤로 가기 시 재생 중단
+  isConversationPlaying = false;
 
   const page = (event.state && event.state.page) ? event.state.page : 'home';
   isBackAction = true;
@@ -79,7 +79,7 @@ function goTo(page, isReplace = false) {
   if ("speechSynthesis" in window) {
     window.speechSynthesis.cancel();
   }
-  isConversationPlaying = false; // 페이지 이동 시 재생 중단
+  isConversationPlaying = false;
 
   if (!isBackAction) {
     if (isReplace) {
@@ -561,21 +561,19 @@ function renderConversationDetail() {
   });
 }
 
-// [수정됨] 대화 전체 듣기 (Promise & Await 적용하여 순차 재생)
+// 대화 전체 듣기 (Promise & Await 적용)
 async function playConversationAll() {
   if ("speechSynthesis" in window) window.speechSynthesis.cancel();
-  isConversationPlaying = true; // 재생 상태 시작
+  isConversationPlaying = true; 
 
   const conv = conversationData.find(c => c.id === currentConvId);
   if (!conv) return;
 
   for (const line of conv.lines) {
-    if (!isConversationPlaying) break; // 뒤로 가기 시 중단
+    if (!isConversationPlaying) break; 
     
-    // 화자에 맞는 목소리로 재생하고 끝날 때까지 기다림
     await speakWithPromise(line.en, line.speaker);
     
-    // 다음 대화 전 0.8초 텀 (자연스러움)
     if (isConversationPlaying) {
       await new Promise(resolve => setTimeout(resolve, 800));
     }
@@ -892,15 +890,13 @@ function movePuzzle(offset) {
 }
 
 // ==========================================
-// 10. TTS 설정 (목소리 구분 로직 추가)
+// 10. TTS 설정 (목소리 구분 및 저장)
 // ==========================================
 let ttsVoices = [];
 let userVoiceIndex = null;
 let userRate = 1.0;
 let userFontSize = 'medium'; 
 let autoPlayEnabled = true;
-
-// [신규] A와 B 화자용 목소리 저장
 let voiceA = null;
 let voiceB = null;
 
@@ -918,14 +914,21 @@ function loadVoices() {
     });
   }
   
-  // [신규] 영어 목소리 2개 찾아서 A/B에 할당 (없으면 null)
+  // [신규] 스마트폰 기본 음성(Google, Apple) 우선 탐색
   const enVoices = ttsVoices.filter(v => v.lang.includes("en"));
-  if (enVoices.length >= 2) {
+  
+  // Google이나 Samantha(iOS) 목소리 우선 찾기
+  const preferredVoices = enVoices.filter(v => v.name.includes("Google") || v.name.includes("Samantha") || v.name.includes("Siri"));
+  
+  if (preferredVoices.length >= 2) {
+    voiceA = preferredVoices[0];
+    voiceB = preferredVoices[1];
+  } else if (enVoices.length >= 2) {
     voiceA = enVoices[0];
     voiceB = enVoices[1];
   } else if (enVoices.length === 1) {
     voiceA = enVoices[0];
-    voiceB = enVoices[0]; // 하나뿐이면 같은 목소리로 톤 조절
+    voiceB = enVoices[0];
   }
 
   const raw = localStorage.getItem("ttsSettings");
@@ -941,7 +944,6 @@ function loadVoices() {
 }
 if("speechSynthesis" in window) window.speechSynthesis.onvoiceschanged = loadVoices;
 
-// [수정됨] speaker 인자 추가 (A 또는 B)
 function speakText(text, speaker = null) {
   if (!("speechSynthesis" in window)) {
     alert("이 브라우저는 음성 합성을 지원하지 않습니다.");
@@ -953,24 +955,22 @@ function speakText(text, speaker = null) {
   u.lang = "en-US";
   u.rate = userRate || 1.0;
   
-  // 사용자 지정 목소리가 있으면 우선 사용
   if (userVoiceIndex !== null && ttsVoices[userVoiceIndex]) {
     u.voice = ttsVoices[userVoiceIndex];
   } 
-  // 지정 목소리 없고, 화자(A/B) 정보가 있으면 자동 할당
   else if (speaker === 'A' && voiceA) {
     u.voice = voiceA;
-    u.pitch = 1.0; // 기본 톤
+    u.pitch = 1.0;
   } else if (speaker === 'B' && voiceB) {
     u.voice = voiceB;
-    if (voiceA === voiceB) u.pitch = 0.8; // 목소리 같으면 B는 톤을 낮춤
+    if (voiceA === voiceB) u.pitch = 0.8; // 같은 목소리면 톤 조절
     else u.pitch = 1.0;
   }
 
   window.speechSynthesis.speak(u);
 }
 
-// [신규] 대화 전체 듣기용 Promise 래퍼
+// 대화 전체 듣기용 Promise
 function speakWithPromise(text, speaker) {
   return new Promise(resolve => {
     const u = new SpeechSynthesisUtterance(text);
@@ -988,9 +988,7 @@ function speakWithPromise(text, speaker) {
       else u.pitch = 1.0;
     }
 
-    // 말하기 끝나면 resolve 호출
     u.onend = resolve;
-    // 에러 나도 멈추지 않게 처리
     u.onerror = resolve;
 
     window.speechSynthesis.speak(u);
@@ -1509,6 +1507,10 @@ function getTimeAgo(date) {
   interval = seconds / 60;
   if (interval > 1) return Math.floor(interval) + " mins ago";
   return "Just now";
+}
+
+function initNewsUpdater() {
+  fetchRealNews(); 
 }
 
 // 17. [신규] 문의하기 기능 (EmailJS로 직접 전송)
