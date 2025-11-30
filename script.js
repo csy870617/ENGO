@@ -55,9 +55,6 @@ let shadowingLineIndex = 0;
 let isBackAction = false; 
 let isConversationPlaying = false;
 
-// [신규] 오디오 세션 관리를 위한 ID (중복 재생 방지)
-let currentAudioSessionId = 0;
-
 // ==========================================
 // 2. 네비게이션 (히스토리 API 적용)
 // ==========================================
@@ -67,7 +64,10 @@ window.onpopstate = function(event) {
     openModals.forEach(modal => modal.classList.add('hidden'));
   }
 
-  stopAudio(); // 페이지 이동 시 오디오 완전 중단
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
+  isConversationPlaying = false;
 
   const page = (event.state && event.state.page) ? event.state.page : 'home';
   isBackAction = true;
@@ -76,7 +76,10 @@ window.onpopstate = function(event) {
 };
 
 function goTo(page, isReplace = false) {
-  stopAudio(); // 이동 시 오디오 중단 및 세션 초기화
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
+  isConversationPlaying = false;
 
   if (!isBackAction) {
     if (isReplace) {
@@ -101,15 +104,6 @@ function goTo(page, isReplace = false) {
   if (page === "conversations") renderConversationList();
   if (page === "shadowing-list") renderShadowingList();
   if (page === "puzzle") initPuzzle();
-}
-
-// [신규] 오디오 중단 및 세션 만료 처리 함수
-function stopAudio() {
-  if ("speechSynthesis" in window) {
-    window.speechSynthesis.cancel();
-  }
-  isConversationPlaying = false;
-  currentAudioSessionId++; // 세션 ID를 증가시켜 이전 루프를 무효화
 }
 
 // ==========================================
@@ -567,32 +561,25 @@ function renderConversationDetail() {
   });
 }
 
-// [수정됨] 대화 전체 듣기 (세션 ID 체크로 중복 방지)
+// 대화 전체 듣기 (Promise & Await 적용)
 async function playConversationAll() {
-  stopAudio(); // 기존 오디오 완전 중단
-  
-  // 새 세션 시작
-  currentAudioSessionId++;
-  const mySessionId = currentAudioSessionId;
+  if ("speechSynthesis" in window) window.speechSynthesis.cancel();
   isConversationPlaying = true; 
 
   const conv = conversationData.find(c => c.id === currentConvId);
   if (!conv) return;
 
   for (const line of conv.lines) {
-    // 세션 ID가 바뀌었으면(다른 페이지 이동 등) 즉시 중단
-    if (currentAudioSessionId !== mySessionId || !isConversationPlaying) break;
+    if (!isConversationPlaying) break; 
     
     await speakWithPromise(line.en, line.speaker);
     
-    if (currentAudioSessionId !== mySessionId || !isConversationPlaying) break;
-    
-    await new Promise(resolve => setTimeout(resolve, 800));
+    if (isConversationPlaying) {
+      await new Promise(resolve => setTimeout(resolve, 800));
+    }
   }
   
-  if (currentAudioSessionId === mySessionId) {
-    isConversationPlaying = false;
-  }
+  isConversationPlaying = false;
 }
 
 function startShadowingFromConv(id) {
@@ -792,7 +779,7 @@ function nextRandomShadowingTopic() {
 }
 
 // ==========================================
-// 9. 문장 퍼즐 (Puzzle)
+// 9. 문장 퍼즐 (Puzzle) (수정됨: 예문 포함 & 5단어 이상)
 // ==========================================
 let puzzleList = [];
 let currentPuzzleIndex = 0;
@@ -803,16 +790,44 @@ let puzzleShuffledTokens = [];
 function initPuzzle() {
   if (puzzleList.length === 0) {
     let pool = [];
+    
+    // 헬퍼 함수: 유효한 문장(5단어 이상)만 추가
+    const addIfValid = (en, kr) => {
+      const cleanEn = en.trim();
+      if (cleanEn.split(/\s+/).length >= 5) {
+        pool.push({ en: cleanEn, kr: kr });
+      }
+    };
+
+    // 1. 대화
     if (typeof conversationData !== "undefined") {
-      conversationData.forEach(c => c.lines.forEach(l => {
-        if (l.en.trim().split(" ").length > 2) pool.push({ en: l.en, kr: l.kr });
-      }));
+      conversationData.forEach(c => c.lines.forEach(l => addIfValid(l.en, l.kr)));
     }
+    
+    // 2. 패턴
     if (typeof patternData !== "undefined") {
-      patternData.forEach(p => p.examples.forEach(ex => {
-        if (ex.en.trim().split(" ").length > 2) pool.push({ en: ex.en, kr: ex.kr });
-      }));
+      patternData.forEach(p => p.examples.forEach(ex => addIfValid(ex.en, ex.kr)));
     }
+
+    // 3. 단어 (추가됨)
+    if (typeof wordData !== "undefined") {
+      wordData.forEach(w => {
+        if (w.examples) w.examples.forEach(ex => addIfValid(ex.en, ex.kr));
+      });
+    }
+
+    // 4. 숙어 (추가됨)
+    if (typeof idiomData !== "undefined") {
+      idiomData.forEach(i => {
+        if (i.examples) i.examples.forEach(ex => addIfValid(ex.en, ex.kr));
+      });
+    }
+
+    // 데이터가 없을 경우 대비
+    if (pool.length === 0) {
+       pool.push({ en: "Welcome to English learning puzzle game.", kr: "영어 학습 퍼즐 게임에 오신 것을 환영합니다." });
+    }
+
     puzzleList = pool.sort(() => Math.random() - 0.5);
     currentPuzzleIndex = 0;
   }
@@ -982,7 +997,6 @@ function speakText(text, speaker = null) {
   window.speechSynthesis.speak(u);
 }
 
-// Promise 기반 TTS (세션 체크 포함)
 function speakWithPromise(text, speaker) {
   return new Promise(resolve => {
     const u = new SpeechSynthesisUtterance(text);
@@ -1000,9 +1014,7 @@ function speakWithPromise(text, speaker) {
       else u.pitch = 1.0;
     }
 
-    // 말하기 끝나면 resolve
     u.onend = resolve;
-    // 에러나 취소 시에도 resolve (멈춤 방지)
     u.onerror = resolve;
 
     window.speechSynthesis.speak(u);
