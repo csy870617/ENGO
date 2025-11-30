@@ -55,6 +55,9 @@ let shadowingLineIndex = 0;
 let isBackAction = false; 
 let isConversationPlaying = false;
 
+// [신규] 오디오 세션 관리를 위한 ID (중복 재생 방지)
+let currentAudioSessionId = 0;
+
 // ==========================================
 // 2. 네비게이션 (히스토리 API 적용)
 // ==========================================
@@ -64,10 +67,7 @@ window.onpopstate = function(event) {
     openModals.forEach(modal => modal.classList.add('hidden'));
   }
 
-  if ("speechSynthesis" in window) {
-    window.speechSynthesis.cancel();
-  }
-  isConversationPlaying = false;
+  stopAudio(); // 페이지 이동 시 오디오 완전 중단
 
   const page = (event.state && event.state.page) ? event.state.page : 'home';
   isBackAction = true;
@@ -76,10 +76,7 @@ window.onpopstate = function(event) {
 };
 
 function goTo(page, isReplace = false) {
-  if ("speechSynthesis" in window) {
-    window.speechSynthesis.cancel();
-  }
-  isConversationPlaying = false;
+  stopAudio(); // 이동 시 오디오 중단 및 세션 초기화
 
   if (!isBackAction) {
     if (isReplace) {
@@ -104,6 +101,15 @@ function goTo(page, isReplace = false) {
   if (page === "conversations") renderConversationList();
   if (page === "shadowing-list") renderShadowingList();
   if (page === "puzzle") initPuzzle();
+}
+
+// [신규] 오디오 중단 및 세션 만료 처리 함수
+function stopAudio() {
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
+  isConversationPlaying = false;
+  currentAudioSessionId++; // 세션 ID를 증가시켜 이전 루프를 무효화
 }
 
 // ==========================================
@@ -561,25 +567,32 @@ function renderConversationDetail() {
   });
 }
 
-// 대화 전체 듣기 (Promise & Await 적용)
+// [수정됨] 대화 전체 듣기 (세션 ID 체크로 중복 방지)
 async function playConversationAll() {
-  if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  stopAudio(); // 기존 오디오 완전 중단
+  
+  // 새 세션 시작
+  currentAudioSessionId++;
+  const mySessionId = currentAudioSessionId;
   isConversationPlaying = true; 
 
   const conv = conversationData.find(c => c.id === currentConvId);
   if (!conv) return;
 
   for (const line of conv.lines) {
-    if (!isConversationPlaying) break; 
+    // 세션 ID가 바뀌었으면(다른 페이지 이동 등) 즉시 중단
+    if (currentAudioSessionId !== mySessionId || !isConversationPlaying) break;
     
     await speakWithPromise(line.en, line.speaker);
     
-    if (isConversationPlaying) {
-      await new Promise(resolve => setTimeout(resolve, 800));
-    }
+    if (currentAudioSessionId !== mySessionId || !isConversationPlaying) break;
+    
+    await new Promise(resolve => setTimeout(resolve, 800));
   }
   
-  isConversationPlaying = false;
+  if (currentAudioSessionId === mySessionId) {
+    isConversationPlaying = false;
+  }
 }
 
 function startShadowingFromConv(id) {
@@ -914,10 +927,9 @@ function loadVoices() {
     });
   }
   
-  // [신규] 스마트폰 기본 음성(Google, Apple) 우선 탐색
   const enVoices = ttsVoices.filter(v => v.lang.includes("en"));
   
-  // Google이나 Samantha(iOS) 목소리 우선 찾기
+  // 스마트폰 우선순위 목소리 찾기
   const preferredVoices = enVoices.filter(v => v.name.includes("Google") || v.name.includes("Samantha") || v.name.includes("Siri"));
   
   if (preferredVoices.length >= 2) {
@@ -963,14 +975,14 @@ function speakText(text, speaker = null) {
     u.pitch = 1.0;
   } else if (speaker === 'B' && voiceB) {
     u.voice = voiceB;
-    if (voiceA === voiceB) u.pitch = 0.8; // 같은 목소리면 톤 조절
+    if (voiceA === voiceB) u.pitch = 0.8; 
     else u.pitch = 1.0;
   }
 
   window.speechSynthesis.speak(u);
 }
 
-// 대화 전체 듣기용 Promise
+// Promise 기반 TTS (세션 체크 포함)
 function speakWithPromise(text, speaker) {
   return new Promise(resolve => {
     const u = new SpeechSynthesisUtterance(text);
@@ -988,7 +1000,9 @@ function speakWithPromise(text, speaker) {
       else u.pitch = 1.0;
     }
 
+    // 말하기 끝나면 resolve
     u.onend = resolve;
+    // 에러나 취소 시에도 resolve (멈춤 방지)
     u.onerror = resolve;
 
     window.speechSynthesis.speak(u);
@@ -1542,7 +1556,6 @@ function sendInquiry() {
     to_name: "Admin"
   };
 
-  // ⚠️ YOUR_SERVICE_ID, YOUR_TEMPLATE_ID 부분 수정 필요
   if (typeof emailjs !== 'undefined') {
     emailjs.send('service_c7njd5n', 'template_7tws5sz', templateParams)
       .then(function(response) {
