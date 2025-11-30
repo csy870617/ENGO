@@ -1309,29 +1309,35 @@ document.body.addEventListener('click', function unlockTTS() {
 }, { once: true });
 
 // ==========================================
-// 14. PWA 설치 배너 로직
+// 14. [수정됨] PWA 설치 배너 로직 (설치됨 감지 강화)
 // ==========================================
 let deferredPrompt;
 const installBanner = document.getElementById('install-banner');
 
+// [신규] 이미 앱으로 실행 중인지 확인 (Standalone 모드)
+const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+
 window.addEventListener('beforeinstallprompt', (e) => {
-  console.log("✅ PWA 설치 이벤트 감지됨!"); 
   e.preventDefault();
   deferredPrompt = e;
   
-  if (!localStorage.getItem('installBannerDismissed')) {
+  // 1. 이미 배너를 닫았거나(설치했거나)
+  // 2. 현재 앱으로 실행 중이라면 배너를 띄우지 않음
+  if (!localStorage.getItem('installBannerDismissed') && !isStandalone) {
     installBanner.classList.remove('hidden');
+    console.log("✅ PWA 설치 배너 표시됨");
   }
 });
 
 async function installPWA() {
   if (!deferredPrompt) {
-    alert("브라우저 메뉴의 [홈 화면에 추가]나 [앱 설치]를 이용해주세요.");
+    alert("이미 설치되어 있거나, 브라우저 메뉴의 [앱 설치]를 이용해야 합니다.");
     return;
   }
   
   deferredPrompt.prompt();
   const { outcome } = await deferredPrompt.userChoice;
+  console.log(`설치 응답 결과: ${outcome}`);
   
   deferredPrompt = null;
   installBanner.classList.add('hidden');
@@ -1339,12 +1345,18 @@ async function installPWA() {
 
 function hideInstallBanner() {
   installBanner.classList.add('hidden');
+  // '닫기'를 누르면 다시는 안 뜨게 저장
   localStorage.setItem('installBannerDismissed', 'true');
 }
 
+// [신규] 설치가 완료되면 -> '닫기' 누른 것처럼 처리하여 배너 영구 숨김
 window.addEventListener('appinstalled', () => {
+  console.log("🎉 앱이 설치되었습니다.");
   installBanner.classList.add('hidden');
   deferredPrompt = null;
+  
+  // 설치 완료 정보를 저장 (재접속 시 배너 안 뜨게 함)
+  localStorage.setItem('installBannerDismissed', 'true');
 });
 
 // ==========================================
@@ -1606,3 +1618,4 @@ initNewsUpdater();
 // 초기 화면 렌더링 (중복 히스토리 방지)
 const initialPage = location.hash.replace('#', '') || 'home';
 goTo(initialPage, true);
+
